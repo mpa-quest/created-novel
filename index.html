@@ -101,6 +101,9 @@ div.bx{cursor:default}
 .bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
 .bar b{font-size:15px;margin-right:auto;flex:1 1 11em;min-width:7em;overflow-wrap:anywhere}
 .bar button,.bar select,.bar .badge{white-space:nowrap;flex:none}
+.bar.sb{margin-bottom:12px}
+.bar.sb b{order:2;flex:1 1 100%;margin:6px 0 0}
+.bar.sb button:last-of-type{margin-left:auto}
 .bar button,.add,.pri{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-weight:500;font-size:14px;border-radius:8px;padding:5px 11px;cursor:pointer}
 .add{width:100%;padding:12px;border-style:dashed;color:var(--accent)}
 .pri{background:var(--accent);color:var(--on);border-color:var(--accent)}
@@ -227,7 +230,7 @@ const mv=(i,dir)=>{const L=S.scenes,lv=lvOf(L[i]),e=blockEnd(i);
   if(p<0||lvOf(L[p])!==lv)return null;return [p,i,e]};
 const nums=()=>{const c=[0,0,0],nm=['大','中','小'];return S.scenes.map(s=>{const l=lvOf(s)-1;c[l]++;for(let k=l+1;k<3;k++)c[k]=0;return nm[l]+'箱 '+c.slice(0,l+1).join('-')})};
 const sbar=(i,label)=>{const s=S.scenes[i],lv=lvOf(s);
-  return `<div class="bar"><b>${label}${lv<3&&s.title?'｜'+esc(s.title):''}</b><select data-a="scenes" data-i="${i}" data-k="lv" aria-label="箱の大きさ">${[[1,'大箱'],[2,'中箱'],[3,'小箱']].map(([v,t])=>`<option value="${v}" ${v===lv?'selected':''}>${t}</option>`).join('')}</select>${lv===1?`<select data-a="scenes" data-i="${i}" data-k="part" aria-label="構成上の位置">${METHODS[S.method||'kisho'].p.map((n,k)=>`<option value="${k}" ${(s.part||0)===k?'selected':''}>${n}</option>`).join('')}</select>`:''}<button data-act="up" data-k="scenes" data-i="${i}" ${mv(i,-1)?'':'disabled'} aria-label="上へ">↑</button><button data-act="down" data-k="scenes" data-i="${i}" ${mv(i,1)?'':'disabled'} aria-label="下へ">↓</button><button data-act="del" data-k="scenes" data-i="${i}">削除</button></div>`};
+  return `<div class="bar sb"><b>${label}${lv<3&&s.title?'｜'+esc(s.title):''}</b><select data-a="scenes" data-i="${i}" data-k="lv" aria-label="箱の大きさ">${[[1,'大箱'],[2,'中箱'],[3,'小箱']].map(([v,t])=>`<option value="${v}" ${v===lv?'selected':''}>${t}</option>`).join('')}</select>${lv===1?`<select data-a="scenes" data-i="${i}" data-k="part" aria-label="構成上の位置">${METHODS[S.method||'kisho'].p.map((n,k)=>`<option value="${k}" ${(s.part||0)===k?'selected':''}>${n}</option>`).join('')}</select>`:''}<button data-act="up" data-k="scenes" data-i="${i}" ${mv(i,-1)?'':'disabled'} aria-label="上へ">↑</button><button data-act="down" data-k="scenes" data-i="${i}" ${mv(i,1)?'':'disabled'} aria-label="下へ">↓</button><button data-act="del" data-k="scenes" data-i="${i}">削除</button></div>`};
 const extras=(c,i)=>(c.extra||[]).map((x,j)=>`<div class="xf"><div class="xh"><input data-x="${i}.${j}" data-xk="k" value="${esc(x.k)}" placeholder="項目名（例：口癖、年齢、好きなもの）" aria-label="項目名"><button data-act="xdel" data-i="${i}" data-j="${j}">削除</button></div><textarea rows="2" data-x="${i}.${j}" data-xk="v" aria-label="内容">${esc(x.v)}</textarea></div>`).join('');
 const METHODS={kisho:{n:'起承転結',p:['起','承','転','結'],s:['状況設定','展開・障害','転換・山場','決着']},jo:{n:'序破急',p:['序','破','急'],s:['導入','展開','山場と結末']},san:{n:'三幕構成',p:['第1幕','第2幕','第3幕'],s:['設定','対立','解決']}};
 const CIRC='①②③④⑤⑥⑦⑧⑨⑩';
