@@ -98,8 +98,9 @@ div.bx{cursor:default}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 130px;gap:10px}
 @media(max-width:560px){.row,.row3{grid-template-columns:1fr}}
-.bar{display:flex;align-items:center;gap:6px;margin-bottom:10px}
-.bar b{font-size:15px;margin-right:auto}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+.bar b{font-size:15px;margin-right:auto;flex:1 1 11em;min-width:7em;overflow-wrap:anywhere}
+.bar button,.bar select,.bar .badge{white-space:nowrap;flex:none}
 .bar button,.add,.pri{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-weight:500;font-size:14px;border-radius:8px;padding:5px 11px;cursor:pointer}
 .add{width:100%;padding:12px;border-style:dashed;color:var(--accent)}
 .pri{background:var(--accent);color:var(--on);border-color:var(--accent)}
