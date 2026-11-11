@@ -89,6 +89,9 @@ div.bx{cursor:default}
 .list{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;max-height:60vh;overflow:auto}
 .li{display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:left;width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px;cursor:pointer;overflow-wrap:anywhere}
 .li.lh{font-weight:700;margin-top:6px}
+.gh{display:flex;gap:4px;align-items:stretch}.gh .li{flex:1;min-width:0}
+.tg{flex:none;width:36px;margin-top:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;cursor:pointer;font-family:inherit}
+.lh2{font-weight:700;font-size:13px;color:var(--sub);margin:10px 0 2px}
 .li.sub{margin-left:14px;width:calc(100% - 14px);font-size:13px}
 .li.on{background:var(--accent);color:var(--on);border-color:var(--accent)}
 .li.on .badge{color:var(--on);border-color:var(--on)}
@@ -123,7 +126,7 @@ div.bx{cursor:default}
 </div>
 <script>
 const KEY='sousaku-note-v1';
-const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],refs:[],notes:''});
+const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],notes:''});
 let S=blank(),tab='ov';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(blank(),JSON.parse(r))}catch(e){}
 const migrate=()=>{S.pl=S.pl||{};const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
@@ -153,7 +156,7 @@ const conflictMsg=id=>'競合：'+(id==='index'?'作品一覧':'「'+wname(id)+'
 const push=async(id,force)=>{id=id||WL.cur;if(!ST.cfg)return;setStat('同期中…');try{const data=await getData(id);if(!data)return;if(id!=='index'&&!(await uploadImgs(data))){setStat('画像の送信に失敗しました（あとで再試行します）');return}const r=await call({id,op:'put',data,base:force?-1:(ST.srv[id]||0)});if(r.ok){ST.srv[id]=r.updated;ST.dirty[id]=false;stSave();setStat('同期済み')}else if(r.error==='conflict')setStat(conflictMsg(id));else setStat('同期エラー：'+r.error)}catch(e){setStat('オフライン（あとで同期します）')}};
 const syncDirty=async()=>{if(!ST.cfg)return;for(const id of ['index',...WL.list.map(w=>w.id),...WL.series.map(s=>s.id)])if(ST.dirty[id])await push(id)};
 const localHas=async id=>{if(id==='index')return JSON.stringify([WL.list,WL.series])!==JSON.stringify([defaultWL().list,[]]);if(id.startsWith('sr')){if(id===curSid())return JSON.stringify(SRD)!==JSON.stringify(normSR(null));try{return !!(await kvGet('SR:'+id))}catch(e){return false}}if(id===WL.cur)return JSON.stringify(S)!==JSON.stringify(blank());try{return !!(await kvGet('S:'+id))}catch(e){return false}};
-const loadCur=async()=>{let d=null;try{d=await kvGet('S:'+WL.cur)}catch(e){}S=d?Object.assign(blank(),d):blank();SEL.chars=0;SEL.r={sc:'w',gi:0,ii:-1};migrate();await loadSR();applyShared();await migImgs();await loadImgs()};
+const loadCur=async()=>{let d=null;try{d=await kvGet('S:'+WL.cur)}catch(e){}S=d?Object.assign(blank(),d):blank();SEL.chars=0;SEL.cg=-1;SEL.r={sc:'w',gi:0,ii:-1};migrate();await loadSR();applyShared();await migImgs();await loadImgs()};
 const applyDoc=async(id,data)=>{
   if(id==='index'){if(data.list&&data.list.length)WL.list=data.list;if(data.series)WL.series=data.series;if(!WL.list.some(w=>w.id===WL.cur)){WL.cur=WL.list[0].id;await loadCur()}else{await loadSR();applyShared()}persistWL();render();return}
   if(id.startsWith('sr')){if(id===curSid()){SRD=normSR(data);persistSR();applyShared();persist();await loadImgs();render()}else await kvSet('SR:'+id,normSR(data));return}
@@ -172,7 +175,7 @@ const pullDoc=async(id,force)=>{if(!ST.cfg)return;setStat('同期中…');try{
 const pull=async force=>{if(!ST.cfg)return;await pullDoc('index');if(curSid())await pullDoc(curSid());await pullDoc(WL.cur,force);fetchMissing()};
 const flushCur=async()=>{try{await kvSet('S:'+WL.cur,S)}catch(e){}if(ST.cfg&&ST.dirty[WL.cur])await push(WL.cur);const sd=curSid();if(ST.cfg&&sd&&ST.dirty[sd])await push(sd)};
 const switchTo=async id=>{if(id===WL.cur)return;await flushCur();WL.cur=id;persistWL();await loadCur();tab='ov';render();const sd=curSid();if(sd)await pullDoc(sd);await pullDoc(id);fetchMissing()};
-const newWork=async()=>{await flushCur();const sd=curSid(),id='w'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);WL.list.push(sd?{id,name:'',sid:sd}:{id,name:''});WL.cur=id;S=blank();SEL.chars=0;SEL.r={sc:'w',gi:0,ii:-1};await loadSR();persistWL();persist();touch('index');touch(id);tab='ov';render()};
+const newWork=async()=>{await flushCur();const sd=curSid(),id='w'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);WL.list.push(sd?{id,name:'',sid:sd}:{id,name:''});WL.cur=id;S=blank();SEL.chars=0;SEL.cg=-1;SEL.r={sc:'w',gi:0,ii:-1};await loadSR();persistWL();persist();touch('index');touch(id);tab='ov';render()};
 const delWork=async()=>{if(WL.list.length<2)return;const id=WL.cur;WL.list=WL.list.filter(w=>w.id!==id);WL.cur=WL.list[0].id;try{await kvDel('S:'+id)}catch(e){}delete ST.dirty[id];delete ST.srv[id];stSave();persistWL();touch('index');if(ST.cfg)call({id,op:'del'}).catch(()=>{});await loadCur();tab='ov';render()};
 const renderWbar=()=>{const e=document.getElementById('wbar');if(!e)return;e.innerHTML=`<select data-w="1" id="wsel" aria-label="作品">${WL.list.map(w=>`<option value="${w.id}" ${w.id===WL.cur?'selected':''}>${esc(w.name)||'（無題）'}</option>`).join('')}</select><button class="sec" data-act="wnew">＋ 新しい作品</button><button class="sec" data-act="wdel" ${WL.list.length<2?'disabled':''}>この作品を削除</button>`};
 const BLANK="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23ccd3da'/%3E%3C/svg%3E";
@@ -186,10 +189,21 @@ const setImg=id=>document.querySelectorAll('img[data-iid="'+id+'"]').forEach(im=
 const uploadImgs=async d=>{for(const id of refIds(d)){if(ST.up[id])continue;const v=IMG[id]||await kvGet('I:'+id);if(!v)continue;const r=await call({op:'imgput',iid:id,data:v});if(!r.ok)return false;ST.up[id]=1;stSave()}return true};
 const fetchMissing=async()=>{if(!ST.cfg||fm)return;fm=true;try{for(const id of allIds()){if(IMG[id])continue;const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){IMG[id]=r.data;ST.up[id]=1;kvSet('I:'+id,r.data).catch(()=>{});setImg(id)}}stSave()}catch(e){}fm=false};
 const exportJson=()=>JSON.stringify(Object.assign({},S,{_imgs:Object.fromEntries(refIds().filter(id=>IMG[id]).map(id=>[id,IMG[id]]))}));
-const SEL={chars:0,r:{sc:'w',gi:0,ii:-1}};
+const SEL={chars:0,cg:-1,r:{sc:'w',gi:0,ii:-1}};
 const selChar=()=>{const n=S.chars.length;if(SEL.chars>=n)SEL.chars=n-1;if(SEL.chars<0)SEL.chars=0;return SEL.chars};
-const charList=()=>{const i=selChar();return S.chars.map((x,k)=>`<button class="li${k===i?' on':''}" data-act="pick" data-t="chars" data-i="${k}">${esc(x.name)||'人物 '+(k+1)}${linked(x)?'<span class="badge">共有</span>':''}</button>`).join('')||'<p class="mut">まだ人物がいません</p>'};
-const charsHead=()=>`<p class="hint">人物ごとの設定を残します。左の一覧から選ぶと、右に詳細が表示されます。</p><div class="ms2"><div class="side"><div class="list">${charList()}</div><button class="add sm" data-act="add" data-k="chars">＋ 人物を追加</button>${shAddUI()}</div><div class="detail">`;
+const cgOpen={};let NEWGRP='';
+const cgSel=()=>{const g=S.cg||[];return SEL.cg>=0&&SEL.cg<g.length?SEL.cg:-1};
+const grpSel=(c,i)=>(S.cg&&S.cg.length)?`<label class="f"><span>区分</span><select data-a="chars" data-i="${i}" data-k="grp"><option value="">未分類</option>${S.cg.map(n=>`<option value="${esc(n)}" ${c.grp===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:'';
+const cgDetail=()=>{const gi=cgSel();if(gi<0)return '';const G=S.cg,n=G[gi],cnt=S.chars.filter(x=>(x.grp||'')===n).length;return `<section class="card"><div class="bar sb"><b>区分</b><button data-act="cgup" data-g="${gi}" ${gi===0?'disabled':''}>↑</button><button data-act="cgdown" data-g="${gi}" ${gi===G.length-1?'disabled':''}>↓</button><button data-act="cgdel" data-g="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-cgn="${gi}" value="${esc(n)}"></label><p class="hint">この区分の人物：${cnt}人。区分を削除すると、人物は「未分類」に移ります。</p></section>`};
+const charList=()=>{const i=selChar(),G=S.cg||[],g=cgSel();
+  const row=(x,k,sub)=>`<button class="li${sub?' sub':''}${k===i&&g<0?' on':''}" data-act="pick" data-t="chars" data-i="${k}">${esc(x.name)||'人物 '+(k+1)}${linked(x)?'<span class="badge">共有</span>':''}</button>`;
+  const all=S.chars.map((x,k)=>({x,k}));
+  if(!G.length)return all.map(o=>row(o.x,o.k,false)).join('')||'<p class="mut">まだ人物がいません</p>';
+  let h=G.map((n,gi)=>{const m=all.filter(o=>(o.x.grp||'')===n);return `<div class="gh"><button class="li lh${gi===g?' on':''}" data-act="pick" data-t="cg" data-g="${gi}">${esc(n)}（${m.length}）</button><button class="tg" data-act="cgtog" data-g="${gi}" aria-label="開閉">${cgOpen[n]===false?'▸':'▾'}</button></div>`+(cgOpen[n]===false?'':m.map(o=>row(o.x,o.k,true)).join(''))}).join('');
+  const un=all.filter(o=>!G.includes(o.x.grp||''));
+  if(un.length)h+=`<div class="lh2">未分類（${un.length}）</div>`+un.map(o=>row(o.x,o.k,true)).join('');
+  return h||'<p class="mut">まだ人物がいません</p>'};
+const charsHead=()=>`<p class="hint">人物ごとの設定を残します。左の一覧から選ぶと、右に詳細が表示されます。</p><div class="ms2"><div class="side"><div class="list">${charList()}</div><button class="add sm" data-act="add" data-k="chars">＋ 人物を追加</button>${shAddUI()}<div class="wbar"><input id="cgnew" placeholder="新しい区分名" aria-label="新しい区分名"><button class="sec" data-act="cgadd">＋ 区分を追加</button></div></div><div class="detail">${cgDetail()}`;
 const refSel=()=>{const G=[...S.refs.map((g,gi)=>({g,sc:'w',gi})),...(SRD?SRD.refs.map((g,gi)=>({g,sc:'s',gi})):[])];let cur=G.find(x=>x.sc===SEL.r.sc&&x.gi===SEL.r.gi);if(!cur&&G.length){cur=G[0];SEL.r={sc:cur.sc,gi:cur.gi,ii:-1}}const ii=cur&&SEL.r.ii>=0&&SEL.r.ii<(cur.g.items||[]).length?SEL.r.ii:-1;return {G,cur,ii}};
 const refSide=()=>{const {G,cur,ii}=refSel();return G.map(({g,sc,gi})=>{const on=cur&&cur.sc===sc&&cur.gi===gi;return `<button class="li lh${on&&ii===-1?' on':''}" data-act="pick" data-t="r" data-s="${sc}" data-g="${gi}">${esc(g.name)||'（区分名なし）'}${sc==='s'?'<span class="badge">共有</span>':''}</button>`+(g.items||[]).map((it,k)=>`<button class="li sub${on&&ii===k?' on':''}" data-act="pick" data-t="r" data-s="${sc}" data-g="${gi}" data-j="${k}">${esc(it.title)||'資料 '+(k+1)}</button>`).join('')}).join('')||'<p class="mut">まだ区分がありません</p>'};
 const refreshList=()=>{const sl=document.querySelector('.side .list');if(!sl)return;if(tab==='chars')sl.innerHTML=charList();else if(tab==='refs')sl.innerHTML=refSide()};
@@ -267,9 +281,9 @@ const VIEWS={
       return `<section class="card lv${lv} ${c}">${sbar(i,N[i])}${body}</section>`}).join('')+
     `<div class="addrow"><button class="add" data-act="add" data-k="scenes" data-lv="1">＋ 大箱</button><button class="add" data-act="add" data-k="scenes" data-lv="2">＋ 中箱</button><button class="add" data-act="add" data-k="scenes" data-lv="3">＋ 小箱</button></div>`},
   chars:()=>charsHead()+
-    (S.chars.length?'':'<div class="empty">左の「＋ 人物を追加」から作りましょう。</div>')+
-    S.chars.map((c,i)=>{if(i!==selChar())return '';const a=`data-a="chars" data-i="${i}"`;
-      return `<section class="card">${bar('chars',i,S.chars.length,(esc(c.name)||'人物 '+(i+1))+(linked(c)?'（共有）':''))}${imgs(c,'chars.'+i)}
+    (S.chars.length||cgSel()>=0?'':'<div class="empty">左の「＋ 人物を追加」から作りましょう。</div>')+
+    S.chars.map((c,i)=>{if(cgSel()>=0||i!==selChar())return '';const a=`data-a="chars" data-i="${i}"`;
+      return `<section class="card">${bar('chars',i,S.chars.length,(esc(c.name)||'人物 '+(i+1))+(linked(c)?'（共有）':''))}${imgs(c,'chars.'+i)}${grpSel(c,i)}
       <div class="g">${CF.filter(f=>f[2]==='i').map(f=>ip(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]])).join('')}</div>
       ${CF.filter(f=>f[2]!=='i').map(f=>ta(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]],f[0]==='other'?4:2)).join('')}
       
@@ -313,7 +327,8 @@ function render(){
 }
 document.addEventListener('input',e=>{
   const t=e.target,d=t.dataset;
-  if(d.w||t.id==='shsel'||d.ws!==undefined)return;
+  if(d.w||t.id==='shsel'||t.id==='cgnew'||d.ws!==undefined)return;
+  if(d.cgn!==undefined){const gi=+d.cgn,old=S.cg[gi],nv=t.value.trim();if(nv&&nv!==old&&!S.cg.includes(nv)){S.cg[gi]=nv;S.chars.forEach(c=>{if((c.grp||'')===old)c.grp=nv});save();refreshList()}return}
   if(d.sn){const s=WL.series.find(x=>x.id===curSid());if(s){s.name=t.value;saveWL()}return}
   if(d.sl!==undefined){SRD.chars[+d.sl].label=t.value;saveSR();return}
   if(d.sf)return;
@@ -323,7 +338,7 @@ document.addEventListener('input',e=>{
   else if(d.pl!==undefined){const m=S.method||'kisho';(S.pl[m]=S.pl[m]||[])[+d.pl]=t.value}
   else if(d.r){const [sc,c,i]=d.r.split('.');R(sc)[+c].items[+i][d.rk]=t.value;touchR(sc);refreshList();return}
   else if(d.x){const [i,j]=d.x.split('.');S.chars[i].extra[j][d.xk]=t.value}
-  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name')refreshList()}if(d.k==='emo'||d.k==='lv')render();}
+  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.k==='emo'||d.k==='lv')render();}
   save();
 });
 document.addEventListener('click',async e=>{
@@ -341,7 +356,11 @@ document.addEventListener('click',async e=>{
   if(act==='rdel'){if(!arm(b,'区分を削除'))return;R(b.dataset.s).splice(i,1);touchR(b.dataset.s);SEL.r={sc:b.dataset.s,gi:Math.max(0,i-1),ii:-1};render();return}
   if(act==='ridel'){if(!arm(b,'削除'))return;R(b.dataset.s)[i].items.splice(+b.dataset.j,1);touchR(b.dataset.s);SEL.r.ii=-1;render();return}
   if(act==='gmove'){const sc=b.dataset.s;if(sc==='s'&&!arm(b,'この作品だけにする','他の作品からは見えなくなります。もう一度押す'))return;const [g]=R(sc).splice(i,1);const tg=sc==='s'?'w':'s';R(tg).push(g);SEL.r={sc:tg,gi:R(tg).length-1,ii:-1};save();saveSR();render();return}
-  if(act==='pick'){if(b.dataset.t==='chars')SEL.chars=i;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='pick'){if(b.dataset.t==='chars'){SEL.chars=i;SEL.cg=-1}else if(b.dataset.t==='cg')SEL.cg=+b.dataset.g;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='cgadd'){const el=document.getElementById('cgnew'),n=el?el.value.trim():'';S.cg=S.cg||[];if(!n||S.cg.includes(n))return;S.cg.push(n);SEL.cg=S.cg.length-1;save();render();return}
+  if(act==='cgtog'){const n=(S.cg||[])[+b.dataset.g];cgOpen[n]=cgOpen[n]===false;refreshList();return}
+  if(act==='cgup'||act==='cgdown'){const g=+b.dataset.g,j=act==='cgup'?g-1:g+1;if(j<0||j>=S.cg.length)return;[S.cg[g],S.cg[j]]=[S.cg[j],S.cg[g]];SEL.cg=j;save();render();return}
+  if(act==='cgdel'){if(!arm(b,'区分を削除'))return;const g=+b.dataset.g,n=S.cg[g];S.chars.forEach(c=>{if((c.grp||'')===n)c.grp=''});S.cg.splice(g,1);SEL.cg=-1;save();render();return}
   if(act==='wnew'){newWork();return}
   if(act==='wdel'){if(!arm(b,'この作品を削除','この作品を削除します。もう一度押す'))return;delWork();return}
   if(act==='scfg'){const u=document.getElementById('su').value.trim(),t=document.getElementById('st').value;ST.cfg=u&&t?{url:u,token:t}:null;stSave();setStat(ST.cfg?'接続中…':'同期は未設定です');pull();return}
@@ -352,7 +371,7 @@ document.addEventListener('click',async e=>{
   if(act==='xadd'){const c=S.chars[i];(c.extra=c.extra||[]).push({k:'',v:''});save();render();const el=document.querySelector('[data-x="'+i+'.'+(c.extra.length-1)+'"][data-xk="k"]');if(el)el.focus();return}
   if(act==='xdel'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}S.chars[i].extra.splice(+b.dataset.j,1);save();render();return}
   if(act==='tab'){tab=k;render();return}
-  if(act==='add'){if(k==='chars')SEL.chars=S.chars.length;S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
+  if(act==='add'){if(k==='chars'){NEWGRP=cgSel()>=0?S.cg[cgSel()]:((S.chars[selChar()]||{}).grp||'');SEL.chars=S.chars.length;SEL.cg=-1}S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:'',grp:NEWGRP||''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
   if(act==='up'||act==='down'){if(k==='scenes'){const m=mv(i,act==='up'?-1:1);if(m){const L=S.scenes;L.splice(m[0],m[2]-m[0],...L.slice(m[1],m[2]),...L.slice(m[0],m[1]))}}else{const j=act==='up'?i-1:i+1;[S[k][i],S[k][j]]=[S[k][j],S[k][i]];if(k==='chars')SEL.chars=j}save();render();return}
   if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}
     S[k].splice(i,1);save();render();return}
