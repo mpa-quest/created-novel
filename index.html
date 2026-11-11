@@ -220,7 +220,7 @@ const ip=(l,a,v,h)=>`<label class="f"><span>${l}</span><input ${a} value="${esc(
 const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['chars','人物'],['refs','資料'],['series','シリーズ'],['notes','メモ'],['io','保存']];
 
 function bar(kind,i,n,label){
-  return `<div class="bar"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
+  return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
 }
 const lvOf=s=>s.lv||3;
 const blockEnd=i=>{let j=i+1;while(j<S.scenes.length&&lvOf(S.scenes[j])>lvOf(S.scenes[i]))j++;return j};
@@ -291,8 +291,8 @@ const VIEWS={
   refs:()=>{const {cur,ii}=refSel();
     let det='<div class="empty">左の「＋ 区分を追加」から作りましょう。</div>';
     if(cur){const {g,sc,gi}=cur;
-      if(ii===-1)det=`<section class="card"><div class="bar"><b>区分</b>${sc==='s'?'<span class="badge">共有</span>':''}${sc==='w'&&!SRD?'':`<button data-act="gmove" data-s="${sc}" data-i="${gi}">${sc==='s'?'この作品だけにする':'シリーズで共有する'}</button>`}<button data-act="rdel" data-s="${sc}" data-i="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-gn="${sc}.${gi}" value="${esc(g.name)}" placeholder="例：舞台設定"></label><button class="add sm" data-act="radd" data-s="${sc}" data-i="${gi}">＋ 資料を追加</button></section>`;
-      else{const it=g.items[ii],r=`data-r="${sc}.${gi}.${ii}"`;det=`<section class="card"><div class="bar"><b>${esc(g.name)||'区分'}｜資料 ${ii+1}</b><button data-act="ridel" data-s="${sc}" data-i="${gi}" data-j="${ii}">削除</button></div>${ip('タイトル',r+' data-rk="title"',it.title)}${ta('内容・出典',r+' data-rk="body"',it.body,6)}${imgs(it,'refs.'+sc+'.'+gi+'.'+ii)}</section>`}}
+      if(ii===-1)det=`<section class="card"><div class="bar sb"><b>区分</b>${sc==='s'?'<span class="badge">共有</span>':''}${sc==='w'&&!SRD?'':`<button data-act="gmove" data-s="${sc}" data-i="${gi}">${sc==='s'?'この作品だけにする':'シリーズで共有する'}</button>`}<button data-act="rdel" data-s="${sc}" data-i="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-gn="${sc}.${gi}" value="${esc(g.name)}" placeholder="例：舞台設定"></label><button class="add sm" data-act="radd" data-s="${sc}" data-i="${gi}">＋ 資料を追加</button></section>`;
+      else{const it=g.items[ii],r=`data-r="${sc}.${gi}.${ii}"`;det=`<section class="card"><div class="bar sb"><b>${esc(g.name)||'区分'}｜資料 ${ii+1}</b><button data-act="ridel" data-s="${sc}" data-i="${gi}" data-j="${ii}">削除</button></div>${ip('タイトル',r+' data-rk="title"',it.title)}${ta('内容・出典',r+' data-rk="body"',it.body,6)}${imgs(it,'refs.'+sc+'.'+gi+'.'+ii)}</section>`}}
     return `<p class="hint">設定資料を区分ごとにためておく場所です。左の一覧から選ぶと、右に詳細が表示されます。${SRD?'「共有」の区分は、同じシリーズの全作品に表示されます。':''}</p><div class="ms2"><div class="side"><div class="list">${refSide()}</div><button class="add sm" data-act="gadd" data-s="w">＋ 区分を追加</button>${SRD?'<button class="add sm" data-act="gadd" data-s="s">＋ 共有の区分を追加</button>':''}</div><div class="detail">${det}</div></div>`},
   series:()=>{const sid=curSid(),sr=WL.series.find(s=>s.id===sid);
     const opts='<option value="">なし</option>'+WL.series.map(s=>`<option value="${s.id}" ${s.id===sid?'selected':''}>${esc(s.name)||'（無題）'}</option>`).join('');
