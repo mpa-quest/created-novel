@@ -105,6 +105,10 @@ div.bx{cursor:default}
 .bar b{font-size:15px;margin-right:auto;flex:1 1 11em;min-width:7em;overflow-wrap:anywhere}
 .bar button,.bar select,.bar .badge{white-space:nowrap;flex:none}
 .bar.sb{margin-bottom:12px}
+.bar.sb select{max-width:100%}
+.ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.ph b{font-size:17px}.ph span{color:var(--sub);font-size:13px;margin-right:auto}
+.ind1{margin-left:14px;width:calc(100% - 14px)}.ind2{margin-left:28px;width:calc(100% - 28px)}
 .bar.sb b{order:2;flex:1 1 100%;margin:6px 0 0}
 .bar.sb button:last-of-type{margin-left:auto}
 .bar button,.add,.pri{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-weight:500;font-size:14px;border-radius:8px;padding:5px 11px;cursor:pointer}
@@ -129,7 +133,7 @@ const KEY='sousaku-note-v1';
 const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],notes:''});
 let S=blank(),tab='ov';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(blank(),JSON.parse(r))}catch(e){}
-const migrate=()=>{S.pl=S.pl||{};const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
+const migrate=()=>{S.pl=S.pl||{};const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('sousaku',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})};
 const kvSet=async(k,v)=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
@@ -237,14 +241,36 @@ function bar(kind,i,n,label){
   return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
 }
 const lvOf=s=>s.lv||3;
-const blockEnd=i=>{let j=i+1;while(j<S.scenes.length&&lvOf(S.scenes[j])>lvOf(S.scenes[i]))j++;return j};
-const mv=(i,dir)=>{const L=S.scenes,lv=lvOf(L[i]),e=blockEnd(i);
-  if(dir>0){if(e>=L.length||lvOf(L[e])!==lv)return null;return [i,e,blockEnd(e)]}
-  let p=i-1;while(p>=0&&lvOf(L[p])>lv)p--;
-  if(p<0||lvOf(L[p])!==lv)return null;return [p,i,e]};
-const nums=()=>{const c=[0,0,0],nm=['大','中','小'];return S.scenes.map(s=>{const l=lvOf(s)-1;c[l]++;for(let k=l+1;k<3;k++)c[k]=0;return nm[l]+'箱 '+c.slice(0,l+1).join('-')})};
+const bigPart=s=>Math.min(s.part||0,METHODS[S.method||'kisho'].p.length-1);
+const treeD=()=>{const L=S.scenes,by={};L.forEach(s=>{by[s.id]=s});
+  const bigs=L.filter(s=>lvOf(s)===1).map((s,k)=>({s,k})).sort((a,b)=>bigPart(a.s)-bigPart(b.s)||a.k-b.k).map(o=>o.s);
+  const mids=L.filter(s=>lvOf(s)===2),smalls=L.filter(s=>lvOf(s)===3);
+  const isBig=id=>!!by[id]&&lvOf(by[id])===1,isMid=id=>!!by[id]&&lvOf(by[id])===2;
+  const nodes=bigs.map(b=>({s:b,mid:mids.filter(m=>m.pid===b.id).map(m=>({s:m,small:smalls.filter(x=>x.pid===m.id)})),direct:smalls.filter(x=>x.pid===b.id)}));
+  const oMid=mids.filter(m=>!isBig(m.pid)).map(m=>({s:m,small:smalls.filter(x=>x.pid===m.id)}));
+  const oSmall=smalls.filter(x=>!isMid(x.pid)&&!isBig(x.pid));
+  return {nodes,oMid,oSmall}};
+const labels=()=>{const M=METHODS[S.method||'kisho'],T=treeD(),lab={},cnt=M.p.map((_,pi)=>T.nodes.filter(n=>bigPart(n.s)===pi).length),seen=M.p.map(()=>0);
+  T.nodes.forEach(n=>{const pi=bigPart(n.s),k=seen[pi]++,bl=cnt[pi]>1?M.p[pi]+(CIRC[k]||k+1):M.p[pi];lab[n.s.id]='大箱 '+bl;
+    n.mid.forEach((m,mi)=>{const ml=bl+'-'+(mi+1);lab[m.s.id]='中箱 '+ml;m.small.forEach((x,xi)=>{lab[x.id]='小箱 '+ml+'-'+(xi+1)})});
+    n.direct.forEach((x,xi)=>{lab[x.id]='小箱 '+bl+'-直'+(xi+1)})});
+  T.oMid.forEach((m,mi)=>{lab[m.s.id]='中箱（未所属）'+(mi+1);m.small.forEach((x,xi)=>{lab[x.id]='小箱（未所属）'+(mi+1)+'-'+(xi+1)})});
+  T.oSmall.forEach((x,xi)=>{lab[x.id]='小箱（未所属）'+(xi+1)});return lab};
+const sn=s=>{const t=String(s.title||s.event||'').trim();return t.length>12?t.slice(0,12)+'…':t};
+const parOpts=s=>{const lv=lvOf(s),T=treeD(),LB=labels(),o=['<option value="">未所属</option>'];
+  const opt=x=>`<option value="${x.id}" ${s.pid===x.id?'selected':''}>${esc(LB[x.id])}${sn(x)?'｜'+esc(sn(x)):''}</option>`;
+  T.nodes.forEach(n=>{o.push(opt(n.s));if(lv===3)n.mid.forEach(m=>o.push(opt(m.s)))});
+  if(lv===3)T.oMid.forEach(m=>o.push(opt(m.s)));
+  return o.join('')};
+const sibIdx=(i,dir)=>{const L=S.scenes,s=L[i],lv=lvOf(s);const same=x=>lvOf(x)===lv&&(lv===1?bigPart(x)===bigPart(s):(x.pid||'')===(s.pid||''));for(let j=i+dir;j>=0&&j<L.length;j+=dir)if(same(L[j]))return j;return -1};
+const relink=i=>{const L=S.scenes,s=L[i],lv=lvOf(s);
+  if(lv===1){delete s.pid;if(s.part===undefined)s.part=lastPart()}
+  else{let p='';for(let j=i-1;j>=0;j--){if(lvOf(L[j])<lv){p=L[j].id;break}}s.pid=p}
+  L.forEach(x=>{if(x.pid===s.id&&!(lvOf(x)>lv))x.pid=''})};
 const sbar=(i,label)=>{const s=S.scenes[i],lv=lvOf(s);
-  return `<div class="bar sb"><b>${label}${lv<3&&s.title?'｜'+esc(s.title):''}</b><select data-a="scenes" data-i="${i}" data-k="lv" aria-label="箱の大きさ">${[[1,'大箱'],[2,'中箱'],[3,'小箱']].map(([v,t])=>`<option value="${v}" ${v===lv?'selected':''}>${t}</option>`).join('')}</select>${lv===1?`<select data-a="scenes" data-i="${i}" data-k="part" aria-label="構成上の位置">${METHODS[S.method||'kisho'].p.map((n,k)=>`<option value="${k}" ${(s.part||0)===k?'selected':''}>${n}</option>`).join('')}</select>`:''}<button data-act="up" data-k="scenes" data-i="${i}" ${mv(i,-1)?'':'disabled'} aria-label="上へ">↑</button><button data-act="down" data-k="scenes" data-i="${i}" ${mv(i,1)?'':'disabled'} aria-label="下へ">↓</button><button data-act="del" data-k="scenes" data-i="${i}">削除</button></div>`};
+  const lvSel=`<select data-a="scenes" data-i="${i}" data-k="lv" aria-label="箱の種類">${[[1,'大箱'],[2,'中箱'],[3,'小箱']].map(([v,t])=>`<option value="${v}" ${v===lv?'selected':''}>${t}</option>`).join('')}</select>`;
+  const second=lv===1?`<select data-a="scenes" data-i="${i}" data-k="part" aria-label="構成上の位置">${METHODS[S.method||'kisho'].p.map((n,k)=>`<option value="${k}" ${bigPart(s)===k?'selected':''}>${n}</option>`).join('')}</select>`:`<select data-a="scenes" data-i="${i}" data-k="pid" aria-label="所属">${parOpts(s)}</select>`;
+  return `<div class="bar sb"><b>${esc(label)}${lv<3&&s.title?'｜'+esc(s.title):''}</b>${lvSel}${second}<button data-act="up" data-k="scenes" data-i="${i}" ${sibIdx(i,-1)<0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="scenes" data-i="${i}" ${sibIdx(i,1)<0?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="scenes" data-i="${i}">削除</button></div>`};
 const extras=(c,i)=>(c.extra||[]).map((x,j)=>`<div class="xf"><div class="xh"><input data-x="${i}.${j}" data-xk="k" value="${esc(x.k)}" placeholder="項目名（例：口癖、年齢、好きなもの）" aria-label="項目名"><button data-act="xdel" data-i="${i}" data-j="${j}">削除</button></div><textarea rows="2" data-x="${i}.${j}" data-xk="v" aria-label="内容">${esc(x.v)}</textarea></div>`).join('');
 const METHODS={kisho:{n:'起承転結',p:['起','承','転','結'],s:['状況設定','展開・障害','転換・山場','決着']},jo:{n:'序破急',p:['序','破','急'],s:['導入','展開','山場と結末']},san:{n:'三幕構成',p:['第1幕','第2幕','第3幕'],s:['設定','対立','解決']}};
 const CIRC='①②③④⑤⑥⑦⑧⑨⑩';
@@ -252,7 +278,10 @@ const X={};
 const lastPart=()=>{const p=S.scenes.filter(x=>lvOf(x)===1).pop();return p?p.part||0:0};
 const msel=()=>`<label class="f ms"><span>構成法</span><select data-m="1">${Object.keys(METHODS).map(k=>`<option value="${k}" ${k===(S.method||'kisho')?'selected':''}>${METHODS[k].n}</option>`).join('')}</select></label>`;
 const changeMethod=nm=>{const o=METHODS[S.method||'kisho'].p.length,n=METHODS[nm].p.length;S.scenes.forEach(s=>{if(lvOf(s)===1)s.part=Math.round((s.part||0)/(o-1)*(n-1))});S.method=nm;save();render()};
-const tree=()=>{const T=[];let a=null,b=null;S.scenes.forEach(s=>{const l=lvOf(s);if(l===1){a={s,ch:[],k:s.id};T.push(a);b=null;return}if(!a){a={s:null,ch:[],k:'v'+T.length};T.push(a)}if(l===2){b={s,ch:[],k:s.id};a.ch.push(b);return}if(!b){b={s:null,ch:[],k:'v'+a.k};a.ch.push(b)}b.ch.push({s,k:s.id})});return T};
+const tree=()=>{const D=treeD(),w=x=>({s:x,k:x.id}),mk=m=>({s:m.s,k:m.s.id,ch:m.small.map(w)});
+  const T=D.nodes.map(n=>{const ch=n.mid.map(mk);if(n.direct.length)ch.push({s:null,k:'v'+n.s.id,ch:n.direct.map(w)});return {s:n.s,k:n.s.id,ch}});
+  if(D.oMid.length||D.oSmall.length){const ch=D.oMid.map(mk);if(D.oSmall.length)ch.push({s:null,k:'vo',ch:D.oSmall.map(w)});T.push({s:null,k:'v0',ch})}
+  return T};
 const CF=[['name','名前','i'],['role','立場・役割','i'],['alias','別名','i'],['sex','性別','i'],['height','身長','i'],['weight','体重','i'],['blood','血液型','i'],['age','年齢','i'],['bday','誕生日','i'],['numer','数秘'],['trait','性格'],['talent','個性・特技'],['skill','能力・スキル'],['look','見た目'],['past','生い立ち'],['want','欲望'],['secret','隠していること・背景'],['other','その他（自由記述）']];
 const arm=(b,orig,txt)=>{if(b.classList.contains('armed'))return true;b.classList.add('armed');b.textContent=txt||'もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent=orig},3000);return false};
 const tgt=t=>{const p=t.split('.');return p[0]==='chars'?S.chars[+p[1]]:(p[1]==='s'?SRD.refs:S.refs)[+p[2]].items[+p[3]]};
@@ -266,10 +295,8 @@ const VIEWS={
     ta('障害：事件・事情・事実','data-p="ov.conflict"',S.ov.conflict,2)+
     ta('定着・余韻（ラストの着地点）','data-p="ov.ending"',S.ov.ending,2),
   plot:()=>{const m=S.method||'kisho',M=METHODS[m],P=S.pl[m]||[];return msel()+`<p class="hint">${M.n}ごとに、物語の流れを大きくつかみます。</p>`+M.p.map((n,k)=>ta(n+'｜'+M.s[k],`data-pl="${k}"`,P[k]||'',4)).join('')},
-  scenes:()=>{const N=nums();return msel()+`<p class="hint">大箱（大きな流れ）→中箱（まとまり）→小箱（場面）の順に組み立てます。小箱は全${S.scenes.filter(s=>lvOf(s)===3).length}。↑↓は、その箱に続く下の階層ごと動かします。小箱の左の色は感情の動き（緑＝上がる／赤＝下がる）です。</p>`+
-    (S.scenes.length?'':'<div class="empty">まだ箱がありません。下のボタンで追加しましょう。</div>')+
-    S.scenes.map((s,i)=>{
-      const lv=lvOf(s),a=`data-a="scenes" data-i="${i}"`,c=lv===3?(s.emo==='＋'?'up':s.emo==='－'?'down':''):'';
+  scenes:()=>{const T=treeD(),LB=labels(),M=METHODS[S.method||'kisho'];
+    const card=s=>{const i=S.scenes.indexOf(s),lv=lvOf(s),a=`data-a="scenes" data-i="${i}"`,c=lv===3?(s.emo==='＋'?'up':s.emo==='－'?'down':''):'';
       const body=lv===3?`<div class="row3">${ip('場所',a+' data-k="place"',s.place)}${ip('時間',a+' data-k="time"',s.time)}
       <label class="f"><span>感情の動き</span><select ${a} data-k="emo">${['','＋','－','±'].map(o=>`<option value="${o}" ${s.emo===o?'selected':''}>${o||'未設定'}</option>`).join('')}</select></label></div>
       ${ip('登場人物',a+' data-k="chars"',s.chars)}
@@ -278,8 +305,12 @@ const VIEWS={
       :`${ip('タイトル',a+' data-k="title"',s.title,lv===1?'例：起　日常のほころび':'')}
       ${ta(lv===1?'この大箱で描くこと':'この中箱で描くこと',a+' data-k="event"',s.event,2)}
       ${ta('メモ',a+' data-k="memo"',s.memo,2)}`;
-      return `<section class="card lv${lv} ${c}">${sbar(i,N[i])}${body}</section>`}).join('')+
-    `<div class="addrow"><button class="add" data-act="add" data-k="scenes" data-lv="1">＋ 大箱</button><button class="add" data-act="add" data-k="scenes" data-lv="2">＋ 中箱</button><button class="add" data-act="add" data-k="scenes" data-lv="3">＋ 小箱</button></div>`},
+      return `<section class="card lv${lv} ${c}" id="box-${s.id}">${sbar(i,LB[s.id])}${body}</section>`};
+    let h=msel()+`<p class="hint">構成（${M.n}）ごとに大箱を置き、大箱の下に中箱、中箱の下に小箱をつなげます。「＋ 中箱をこの大箱に追加」などで、つなげた状態で追加できます。つなぎ先は、各カードの「所属」の欄で変えられます。↑ ↓ は、同じ親・同じ構成の中で順番を入れ替えます。小箱は全${S.scenes.filter(s=>lvOf(s)===3).length}。</p>`;
+    M.p.forEach((pn,pi)=>{h+=`<div class="ph"><b>${esc(pn)}</b><span>${esc(M.s[pi])}</span><button class="sec" data-act="addbig" data-part="${pi}">＋ 大箱を追加</button></div>`;
+      T.nodes.filter(n=>bigPart(n.s)===pi).forEach(n=>{h+=card(n.s);n.mid.forEach(m=>{h+=card(m.s);m.small.forEach(x=>{h+=card(x)});h+=`<button class="add sm ind2" data-act="addchild" data-pid="${m.s.id}" data-lv="3">＋ 小箱をこの中箱に追加</button>`});n.direct.forEach(x=>{h+=card(x)});h+=`<button class="add sm ind1" data-act="addchild" data-pid="${n.s.id}" data-lv="2">＋ 中箱をこの大箱に追加</button>`})});
+    if(T.oMid.length||T.oSmall.length){h+=`<div class="ph"><b>未所属の箱</b><span>「所属」を選ぶと、構成に入ります</span></div>`;T.oMid.forEach(m=>{h+=card(m.s);m.small.forEach(x=>{h+=card(x)})});T.oSmall.forEach(x=>{h+=card(x)})}
+    return h},
   chars:()=>charsHead()+
     (S.chars.length||cgSel()>=0?'':'<div class="empty">左の「＋ 人物を追加」から作りましょう。</div>')+
     S.chars.map((c,i)=>{if(cgSel()>=0||i!==selChar())return '';const a=`data-a="chars" data-i="${i}"`;
@@ -338,7 +369,7 @@ document.addEventListener('input',e=>{
   else if(d.pl!==undefined){const m=S.method||'kisho';(S.pl[m]=S.pl[m]||[])[+d.pl]=t.value}
   else if(d.r){const [sc,c,i]=d.r.split('.');R(sc)[+c].items[+i][d.rk]=t.value;touchR(sc);refreshList();return}
   else if(d.x){const [i,j]=d.x.split('.');S.chars[i].extra[j][d.xk]=t.value}
-  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.k==='emo'||d.k==='lv')render();}
+  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.a==='scenes'&&d.k==='lv')relink(+d.i);if(d.k==='emo'||d.k==='lv'||d.k==='pid'||d.k==='part')render();}
   save();
 });
 document.addEventListener('click',async e=>{
@@ -357,6 +388,8 @@ document.addEventListener('click',async e=>{
   if(act==='ridel'){if(!arm(b,'削除'))return;R(b.dataset.s)[i].items.splice(+b.dataset.j,1);touchR(b.dataset.s);SEL.r.ii=-1;render();return}
   if(act==='gmove'){const sc=b.dataset.s;if(sc==='s'&&!arm(b,'この作品だけにする','他の作品からは見えなくなります。もう一度押す'))return;const [g]=R(sc).splice(i,1);const tg=sc==='s'?'w':'s';R(tg).push(g);SEL.r={sc:tg,gi:R(tg).length-1,ii:-1};save();saveSR();render();return}
   if(act==='pick'){if(b.dataset.t==='chars'){SEL.chars=i;SEL.cg=-1}else if(b.dataset.t==='cg')SEL.cg=+b.dataset.g;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
+  if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='cgadd'){const el=document.getElementById('cgnew'),n=el?el.value.trim():'';S.cg=S.cg||[];if(!n||S.cg.includes(n))return;S.cg.push(n);SEL.cg=S.cg.length-1;save();render();return}
   if(act==='cgtog'){const n=(S.cg||[])[+b.dataset.g];cgOpen[n]=cgOpen[n]===false;refreshList();return}
   if(act==='cgup'||act==='cgdown'){const g=+b.dataset.g,j=act==='cgup'?g-1:g+1;if(j<0||j>=S.cg.length)return;[S.cg[g],S.cg[j]]=[S.cg[j],S.cg[g]];SEL.cg=j;save();render();return}
@@ -372,7 +405,7 @@ document.addEventListener('click',async e=>{
   if(act==='xdel'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}S.chars[i].extra.splice(+b.dataset.j,1);save();render();return}
   if(act==='tab'){tab=k;render();return}
   if(act==='add'){if(k==='chars'){NEWGRP=cgSel()>=0?S.cg[cgSel()]:((S.chars[selChar()]||{}).grp||'');SEL.chars=S.chars.length;SEL.cg=-1}S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:'',grp:NEWGRP||''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
-  if(act==='up'||act==='down'){if(k==='scenes'){const m=mv(i,act==='up'?-1:1);if(m){const L=S.scenes;L.splice(m[0],m[2]-m[0],...L.slice(m[1],m[2]),...L.slice(m[0],m[1]))}}else{const j=act==='up'?i-1:i+1;[S[k][i],S[k][j]]=[S[k][j],S[k][i]];if(k==='chars')SEL.chars=j}save();render();return}
+  if(act==='up'||act==='down'){if(k==='scenes'){const j=sibIdx(i,act==='up'?-1:1);if(j>=0){const L=S.scenes;[L[i],L[j]]=[L[j],L[i]]}}else{const j=act==='up'?i-1:i+1;[S[k][i],S[k][j]]=[S[k][j],S[k][i]];if(k==='chars')SEL.chars=j}save();render();return}
   if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}
     S[k].splice(i,1);save();render();return}
   if(act==='copy'){const o=document.getElementById('out'),m=document.getElementById('msg');o.select();
