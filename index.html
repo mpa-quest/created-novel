@@ -111,6 +111,12 @@ div.bx{cursor:default}
 .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
 .usage{white-space:pre-wrap;font-size:14px;line-height:1.8;margin-top:8px}
 .chk1{display:flex;align-items:center;gap:8px;font-size:15px}.chk1 input{width:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:14px;cursor:pointer;background:var(--surface)}.chip input{width:auto;margin:0}
+.li .lt{flex:1;min-width:0}.cnt{font-size:12px;color:var(--sub);flex:none}.li.on .cnt{color:var(--on)}.cnt.zero{color:var(--down)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--line)}.dot.d1{background:var(--c3)}.dot.d2{background:var(--up)}
+.pbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0}.pbar i{display:block;height:100%;background:var(--c1)}
+.wsum{font-size:14px;line-height:1.8}
+.ctx{background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}.ctx b{display:inline-block;min-width:3.5em;color:var(--sub);font-weight:500}
 .ph b{font-size:17px}.ph span{color:var(--sub);font-size:13px;margin-right:auto}
 .ind1{margin-left:14px;width:calc(100% - 14px);color:var(--c2);border-color:var(--c2)}.ind2{margin-left:28px;width:calc(100% - 28px);color:var(--c3);border-color:var(--c3)}
 .sec.c1b{color:var(--c1);border-color:var(--c1)}
@@ -136,7 +142,7 @@ div.bx{cursor:default}
 </div>
 <script>
 const KEY='sousaku-note-v1';
-const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],notes:''});
+const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],goal:{pages:'',deadline:''},notes:''});
 let S=blank(),tab='ov';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(blank(),JSON.parse(r))}catch(e){}
 const migrate=()=>{S.pl=S.pl||{};const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
@@ -157,7 +163,9 @@ const stSave=()=>{try{localStorage.setItem(SK,JSON.stringify(ST))}catch(e){}};
 let SS='未設定',pt=null;
 const setStat=t=>{SS=t;['sync','sync2'].forEach(i=>{const e=document.getElementById(i);if(e)e.textContent=t})};
 const touch=id=>{if(ST.cfg){ST.dirty[id]=true;stSave();clearTimeout(pt);pt=setTimeout(syncDirty,3000)}};
-const save=()=>{persist();touch(WL.cur);return true};
+let pst=null;
+const flushPersist=()=>{if(pst){clearTimeout(pst);pst=null;persist()}};
+const save=()=>{if(!pst)pst=setTimeout(()=>{pst=null;persist()},400);touch(WL.cur);return true};
 const saveWL=()=>{persistWL();touch('index')};
 const call=async o=>{const r=await fetch(ST.cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({token:ST.cfg.token,id:'main'},o))});return r.json()};
 const getData=async id=>id==='index'?{list:WL.list,series:WL.series}:id===WL.cur?S:id.startsWith('sr')?(id===curSid()?SRD:await kvGet('SR:'+id)):await kvGet('S:'+id);
@@ -199,14 +207,14 @@ const setImg=id=>document.querySelectorAll('img[data-iid="'+id+'"]').forEach(im=
 const uploadImgs=async d=>{for(const id of refIds(d)){if(ST.up[id])continue;const v=IMG[id]||await kvGet('I:'+id);if(!v)continue;const r=await call({op:'imgput',iid:id,data:v});if(!r.ok)return false;ST.up[id]=1;stSave();if(ST.nk)kvDel('I:'+id).catch(()=>{})}return true};
 const fetchMissing=async()=>{if(!ST.cfg||fm||ST.nk)return;fm=true;try{for(const id of allIds()){if(IMG[id])continue;const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){IMG[id]=r.data;ST.up[id]=1;kvSet('I:'+id,r.data).catch(()=>{});setImg(id)}}stSave()}catch(e){}fm=false};
 const exportJson=()=>JSON.stringify(Object.assign({},S,{_imgs:Object.fromEntries(refIds().filter(id=>IMG[id]).map(id=>[id,IMG[id]]))}));
-const SEL={chars:0,cg:-1,r:{sc:'w',gi:0,ii:-1}};
+const SEL={chars:0,cg:-1,w:null,r:{sc:'w',gi:0,ii:-1}};
 const selChar=()=>{const n=S.chars.length;if(SEL.chars>=n)SEL.chars=n-1;if(SEL.chars<0)SEL.chars=0;return SEL.chars};
 const cgOpen={};let NEWGRP='';
 const cgSel=()=>{const g=S.cg||[];return SEL.cg>=0&&SEL.cg<g.length?SEL.cg:-1};
 const grpSel=(c,i)=>(S.cg&&S.cg.length)?`<label class="f"><span>区分</span><select data-a="chars" data-i="${i}" data-k="grp"><option value="">未分類</option>${S.cg.map(n=>`<option value="${esc(n)}" ${c.grp===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:'';
 const cgDetail=()=>{const gi=cgSel();if(gi<0)return '';const G=S.cg,n=G[gi],cnt=S.chars.filter(x=>(x.grp||'')===n).length;return `<section class="card"><div class="bar sb"><b>区分</b><button data-act="cgup" data-g="${gi}" ${gi===0?'disabled':''}>↑</button><button data-act="cgdown" data-g="${gi}" ${gi===G.length-1?'disabled':''}>↓</button><button data-act="cgdel" data-g="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-cgn="${gi}" value="${esc(n)}"></label><p class="hint">この区分の人物：${cnt}人。区分を削除すると、人物は「未分類」に移ります。</p></section>`};
 const charList=()=>{const i=selChar(),G=S.cg||[],g=cgSel();
-  const row=(x,k,sub)=>`<button class="li${sub?' sub':''}${k===i&&g<0?' on':''}" data-act="pick" data-t="chars" data-i="${k}">${esc(x.name)||'人物 '+(k+1)}${linked(x)?'<span class="badge">共有</span>':''}</button>`;
+  const row=(x,k,sub)=>`<button class="li${sub?' sub':''}${k===i&&g<0?' on':''}" data-act="pick" data-t="chars" data-i="${k}">${esc(x.name)||'人物 '+(k+1)}${linked(x)?'<span class="badge">共有</span>':''}${cntBadge(x)}</button>`;
   const all=S.chars.map((x,k)=>({x,k}));
   if(!G.length)return all.map(o=>row(o.x,o.k,false)).join('')||'<p class="mut">まだ人物がいません</p>';
   let h=G.map((n,gi)=>{const m=all.filter(o=>(o.x.grp||'')===n);return `<div class="gh"><button class="li lh${gi===g?' on':''}" data-act="pick" data-t="cg" data-g="${gi}">${esc(n)}（${m.length}）</button><button class="tg" data-act="cgtog" data-g="${gi}" aria-label="開閉">${cgOpen[n]===false?'▸':'▾'}</button></div>`+(cgOpen[n]===false?'':m.map(o=>row(o.x,o.k,true)).join(''))}).join('');
@@ -260,12 +268,34 @@ const ensureImgs=async()=>{for(const id of refIds()){if(IMG[id])continue;let v=n
 let fv=false,fvAgain=false;
 const fetchVisible=async()=>{if(fv){fvAgain=true;return}fv=true;try{do{fvAgain=false;for(const el of [...document.querySelectorAll('img[data-iid]')]){const id=el.dataset.iid;if(IMG[id]){if(el.src!==IMG[id])el.src=IMG[id];continue}let v=null;try{v=await kvGet('I:'+id)}catch(e){}if(!v&&ST.cfg){try{const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){v=r.data;ST.up[id]=1;stSave();if(!ST.nk)kvSet('I:'+id,v).catch(()=>{})}}catch(e){}}if(v){IMG[id]=v;setImg(id)}}}while(fvAgain)}finally{fv=false}};
 const devicePanel=()=>`<section class="card"><div class="bar"><b>この端末の容量</b></div><label class="chk1"><input type="checkbox" data-nk="1" ${ST.nk?'checked':''} ${ST.cfg?'':'disabled'}> この端末に画像を残さない</label><p class="hint">オンにすると、画像は見る時にドライブから取り出し、端末には保存しません。端末の容量は、文章のデータだけになります。画像の表示に通信が必要で、オフラインでは見られません。${ST.cfg?'':'（Googleドライブ同期を設定すると選べます）'}初期設定は、画像を端末に残す（オフ）です。</p><p><button class="sec" data-act="uclean">端末内の送信済みの画像を消す</button></p><p><button class="sec" data-act="ugc">使われていない画像を整理する</button></p><p><button class="sec" data-act="uscan">容量を調べる</button></p><div id="usage" class="usage"></div></section>`;
+const smallsInOrder=()=>{const T=treeD(),o=[];T.nodes.forEach(n=>{n.mid.forEach(m=>m.small.forEach(x=>o.push(x)));n.direct.forEach(x=>o.push(x))});T.oMid.forEach(m=>m.small.forEach(x=>o.push(x)));T.oSmall.forEach(x=>o.push(x));return o};
+const charNames=s=>{const ids=new Set(s.cids||[]);return [...S.chars.filter(c=>ids.has(c.id)).map(c=>c.name||'（名前なし）'),...(s.chars?[s.chars]:[])].join('、')};
+const charPick=(s,i)=>{if(!S.chars.length)return '<p class="hint">人物タブで人物を作ると、ここから登場人物を選べます。</p>';const sel=new Set(s.cids||[]);
+  const chips=S.chars.map(c=>`<label class="chip"><input type="checkbox" data-cp="${i}" data-cid="${c.id}" ${sel.has(c.id)?'checked':''}> ${esc(c.name)||'（名前なし）'}</label>`).join('');
+  const aims=S.chars.filter(c=>sel.has(c.id)).map(c=>ip((esc(c.name)||'人物')+'が、このシーンで望むこと',`data-aim="${i}.${c.id}"`,(s.aims||{})[c.id]||'')).join('');
+  return `<div class="f"><span>登場人物（人物タブから選択）</span><div class="chips">${chips}</div></div>${aims}`};
+const toggleCp=(i,cid,on)=>{const s=S.scenes[i];if(!s)return;s.cids=s.cids||[];if(on){if(!s.cids.includes(cid))s.cids.push(cid)}else{s.cids=s.cids.filter(x=>x!==cid);if(s.aims)delete s.aims[cid]}save();const y=window.scrollY;render();window.scrollTo(0,y)};
+const cntBadge=x=>{const L=smallsInOrder();if(!L.length)return '';const n=L.filter(s=>(s.cids||[]).includes(x.id)).length;return `<span class="cnt${n?'':' zero'}">${n}</span>`};
+const appearHtml=c=>{const all=smallsInOrder();if(!all.length)return '';const L=all.filter(s=>(s.cids||[]).includes(c.id)),LB=labels();return `<div class="f"><span>登場するシーン（${L.length}）</span>${L.length?`<div class="ctx">${L.map(s=>`<div>${esc(LB[s.id])}｜${esc(sn(s)||s.place||'')}</div>`).join('')}</div>`:'<p class="hint">まだ、どのシーンにも登場していません。箱書きの小箱で、登場人物に選んでください。</p>'}</div>`};
+const cc=s=>Array.from(String(s.text||'').replace(/\n/g,'')).length;
+const fmtN=n=>n.toLocaleString('ja-JP');
+const STN={'':'未着手',draft:'下書き',done:'推敲済'};
+const stIdx=s=>s.status==='done'?2:s.status==='draft'?1:0;
+const selW=()=>{const L=smallsInOrder();if(!L.some(x=>x.id===SEL.w))SEL.w=L.length?L[0].id:null;return SEL.w};
+const writeList=()=>{const L=smallsInOrder(),LB=labels(),cur=selW();return L.map(s=>`<button class="li${s.id===cur?' on':''}" data-act="pickw" data-id="${s.id}"><span class="dot d${stIdx(s)}"></span><span class="lt">${esc(LB[s.id].replace('小箱 ',''))}｜${esc(sn(s)||s.place||'（無題）')}</span><span class="cnt">${fmtN(cc(s))}</span></button>`).join('')||'<p class="mut">小箱がありません</p>'};
+const wsumHtml=()=>{const L=smallsInOrder(),n=L.length,tot=L.reduce((a,s)=>a+cc(s),0),pg=tot/400,k=[0,0,0];L.forEach(s=>{k[stIdx(s)]++});
+  const prog=n?Math.round((k[2]+k[1]*0.5)/n*100):0,g=S.goal||{},G=parseFloat(g.pages)||0,dl=g.deadline;
+  let h=`<div>全体：${fmtN(tot)}字（原稿用紙 ${pg.toFixed(1)}枚）／小箱 ${n}（未着手 ${k[0]}・下書き ${k[1]}・推敲済 ${k[2]}）</div><div class="pbar"><i style="width:${prog}%"></i></div><div>進捗：${prog}％（推敲済＝100％、下書き＝50％で計算）</div>`;
+  if(G)h+=`<div>目標 ${G}枚に対して ${(pg/G*100).toFixed(0)}％（あと ${Math.max(0,G-pg).toFixed(1)}枚）</div>`;
+  if(dl){const d=Math.ceil((new Date(dl+'T23:59:59')-new Date())/86400000);h+=`<div>締切：${esc(dl)}（${d>=0?'あと'+d+'日':'締切を過ぎています'}${G&&d>0&&G>pg?'／1日あたり約'+((G-pg)/d).toFixed(1)+'枚':''}）</div>`}
+  return h};
+const refreshWrite=()=>{const e=document.getElementById('wsum');if(e)e.innerHTML=wsumHtml();const sl=document.querySelector('.side .list');if(sl&&tab==='write')sl.innerHTML=writeList();const c=document.getElementById('wcnt');if(c){const s=S.scenes.find(x=>x.id===SEL.w);if(s)c.textContent=fmtN(cc(s))}};
 const syncPanel=()=>{const c=ST.cfg||{};return `<section class="card"><div class="bar"><b>Googleドライブ同期</b></div><label class="f"><span>ウェブアプリのURL（末尾が /exec）</span><input id="su" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><label class="f"><span>合言葉（GASのスクリプトプロパティ TOKEN と同じもの）</span><input id="st" type="password" value="${esc(c.token)}" autocomplete="off"></label><p><button class="pri" data-act="scfg">保存して同期</button></p><p><button class="sec" data-act="spull">サーバーから読み込む</button> <button class="sec" data-act="spush">この端末で上書き</button></p><p class="hint" id="sync2">${esc(SS)}</p></section>`};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,9);
 const ta=(l,a,v,r,h)=>`<label class="f"><span>${l}</span><textarea rows="${r||3}" ${a} placeholder="${h||''}">${esc(v)}</textarea></label>`;
 const ip=(l,a,v,h)=>`<label class="f"><span>${l}</span><input ${a} value="${esc(v)}" placeholder="${h||''}"></label>`;
-const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['chars','人物'],['refs','資料'],['series','シリーズ'],['notes','メモ'],['io','保存']];
+const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['write','執筆'],['chars','人物'],['refs','資料'],['series','シリーズ'],['notes','メモ'],['io','保存']];
 
 function bar(kind,i,n,label){
   return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
@@ -329,10 +359,13 @@ const VIEWS={
     const card=s=>{const i=S.scenes.indexOf(s),lv=lvOf(s),a=`data-a="scenes" data-i="${i}"`,c=lv===3?(s.emo==='＋'?'up':s.emo==='－'?'down':''):'';
       const body=lv===3?`<div class="row3">${ip('場所',a+' data-k="place"',s.place)}${ip('時間',a+' data-k="time"',s.time)}
       <label class="f"><span>感情の動き</span><select ${a} data-k="emo">${['','＋','－','±'].map(o=>`<option value="${o}" ${s.emo===o?'selected':''}>${o||'未設定'}</option>`).join('')}</select></label></div>
-      ${ip('登場人物',a+' data-k="chars"',s.chars)}
+      ${ta('このシーンの役割（物語の中で果たす働き）',a+' data-k="role"',s.role,2)}
+      ${charPick(s,i)}
+      ${ip('その他の登場人物（人物タブにいない人）',a+' data-k="chars"',s.chars)}
       ${ta('出来事（この場面で何が起きるか）',a+' data-k="event"',s.event,3)}
       ${ta('メモ（セリフ案、伏線、描きたい描写）',a+' data-k="memo"',s.memo,2)}`
       :`${ip('タイトル',a+' data-k="title"',s.title,lv===1?'例：起　日常のほころび':'')}
+      ${ta(lv===1?'構成上の機能（この大箱が、物語の構成で果たす役割）':'シークエンスの役割（この中箱が果たす役割）',a+' data-k="role"',s.role,2)}
       ${ta(lv===1?'この大箱で描くこと':'この中箱で描くこと',a+' data-k="event"',s.event,2)}
       ${ta('メモ',a+' data-k="memo"',s.memo,2)}`;
       return `<section class="card lv${lv} ${c}" id="box-${s.id}">${sbar(i,LB[s.id])}${body}</section>`};
@@ -348,7 +381,7 @@ const VIEWS={
       <div class="g">${CF.filter(f=>f[2]==='i').map(f=>ip(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]])).join('')}</div>
       ${CF.filter(f=>f[2]!=='i').map(f=>ta(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]],f[0]==='other'?4:2)).join('')}
       
-      ${extras(c,i)}<button class="add sm" data-act="xadd" data-i="${i}">＋ 項目を追加</button>${shBtn(c,i)}</section>`}).join('')+
+      ${appearHtml(c)}${extras(c,i)}<button class="add sm" data-act="xadd" data-i="${i}">＋ 項目を追加</button>${shBtn(c,i)}</section>`}).join('')+
     '</div></div>',
   sheet:()=>{const M=METHODS[S.method||'kisho'],T=tree(),O=S.ov,cols=[],bands=[];
     M.p.forEach((n,pi)=>{const g=T.filter(a=>Math.min(a.s?a.s.part||0:0,M.p.length-1)===pi);
@@ -358,11 +391,18 @@ const VIEWS={
     const gt=`style="grid-template-columns:repeat(${cols.length},minmax(78px,1fr))"`;
     const big=c=>c.a?`<button class="bx b1${X[c.a.k]?' on':''}" data-act="xp" data-k="${c.a.k}" aria-expanded="${!!X[c.a.k]}"><b>${c.n}</b><em>${esc(c.a.s&&(c.a.s.title||c.a.s.event))}</em><i>${X[c.a.k]?'▾':'▸'} 中箱 ${c.a.ch.length}</i></button>`:`<div class="bx ph"><b>${c.n}</b><em>大箱なし</em></div>`;
     const c2=m=>`<button class="bx b2${X[m.k]?' on':''}" data-act="xp" data-k="${m.k}" aria-expanded="${!!X[m.k]}"><b>${esc(m.s&&m.s.title)||'シークエンス'}</b><em>${esc(m.s&&m.s.event)}</em><i>${X[m.k]?'▾':'▸'} 小箱 ${m.ch.length}</i></button>`;
-    const c3=x=>{const s=x.s;return `<div class="bx b3 ${s.emo==='＋'?'up':s.emo==='－'?'down':''}"><b>${esc(s.place)||'シーン'}${s.time?'・'+esc(s.time):''}</b><em>${esc(s.event)}</em><i>${esc(s.chars)}</i></div>`};
+    const c3=x=>{const s=x.s;return `<div class="bx b3 ${s.emo==='＋'?'up':s.emo==='－'?'down':''}"><b>${esc(s.place)||'シーン'}${s.time?'・'+esc(s.time):''}</b><em>${esc(s.event)}</em><i>${esc(charNames(s))}</i></div>`};
     const ex=c=>{if(!c.a||!X[c.a.k])return '';return `<div class="lvl"><span class="tag">中箱｜${c.n}</span><div class="chs">${c.a.ch.map(c2).join('')||'<p class="mut">中箱がありません</p>'}</div></div>`+c.a.ch.filter(m=>X[m.k]).map(m=>`<div class="lvl l3"><span class="tag">小箱｜${esc(m.s&&m.s.title)||'シークエンス'}</span><div class="chs">${m.ch.map(c3).join('')||'<p class="mut">小箱がありません</p>'}</div></div>`).join('')};
     const tc=(l,v,c)=>`<div class="tc ${c||''}"><b>${l}</b>${v?`<span>${esc(v)}</span>`:'<span class="mut">未入力</span>'}</div>`;
     const top=`<div class="top"><svg class="mtn" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40L8 33L14 36L24 20L30 27L42 10L48 18L60 5L70 16L82 2L100 40Z"/></svg><div class="r1">${tc('アンチテーゼ',O.anti,'g')}<div class="ar"><i>◀</i><i>▶</i></div>${tc('テーマ',O.theme,'g')}</div><div class="r1">${tc('天地人',O.tcj)}${tc('障害：事件・事情・事実',O.conflict)}${tc('定着・余韻',O.ending)}</div><div class="r1">${tc('欲望',O.want)}<div class="ar"><i></i><span class="pill">貫通行動${O.thru?'：'+esc(O.thru):''}</span><i>▶</i></div>${tc('目的',O.goal)}</div></div>`;
     return msel()+`<p class="hint">${S.scenes.length?'入力したデータをシートの形で確認します。大箱・中箱をタップすると、下の階層が展開されます。編集は各タブで行います。':'箱書きタブで大箱・中箱・小箱をつくると、ここに並びます。'}</p><div class="sheet"><div class="sin">${top}<div class="gr" ${gt}>${bands.join('')}</div><div class="gr" ${gt}>${cols.map(big).join('')}</div>${cols.map(ex).join('')}</div></div><p class="note">大箱＝構成上の機能／中箱＝シークエンスの役割／小箱＝その役割とキャラクター</p>`},
+  write:()=>{const L=smallsInOrder(),LB=labels(),cur=selW(),s=L.find(x=>x.id===cur),g=S.goal||{};
+    const top=`<section class="card"><div class="bar"><b>全体の進み具合</b></div><div class="row"><label class="f"><span>目標の枚数（400字詰め）</span><input type="number" min="0" step="0.5" data-gp="1" value="${esc(g.pages)}" placeholder="例：30"></label><label class="f"><span>締切</span><input type="date" data-gd="1" value="${esc(g.deadline)}"></label></div><div id="wsum" class="wsum">${wsumHtml()}</div></section>`;
+    let det='<div class="empty">箱書きタブで小箱をつくると、ここで本文を書けます。</div>';
+    if(s){const ids=new Set(s.cids||[]),cs=S.chars.filter(c=>ids.has(c.id));
+      const ctx=`<div class="ctx">${s.role?`<div><b>役割</b>${esc(s.role)}</div>`:''}${s.event?`<div><b>出来事</b>${esc(s.event)}</div>`:''}${cs.length?`<div><b>登場</b>${esc(cs.map(c=>c.name||'（名前なし）').join('、'))}</div>`:''}${cs.filter(c=>(s.aims||{})[c.id]).map(c=>`<div><b>${esc(c.name||'人物')}</b>${esc(s.aims[c.id])}</div>`).join('')}</div>`;
+      det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>${esc(LB[s.id])}</b><button data-act="gobox" data-id="${s.id}">箱書きで開く</button></div><label class="f"><span>状態</span><select data-st="${s.id}">${Object.entries(STN).map(([k,v])=>`<option value="${k}" ${(s.status||'')===k?'selected':''}>${v}</option>`).join('')}</select></label>${ctx.includes('<div>')?ctx:''}<label class="f"><span>本文（<b id="wcnt">${fmtN(cc(s))}</b>字）</span><textarea rows="20" data-tx="${s.id}" placeholder="ここに本文を書きます">${esc(s.text||'')}</textarea></label></section>`}
+    return `<p class="hint">小箱ごとに本文を書きます。箱書きの順番に、原稿がつながります。</p>${top}<div class="ms2"><div class="side"><div class="list">${writeList()}</div></div><div class="detail">${det}</div></div>`},
   refs:()=>{const {cur,ii}=refSel();
     let det='<div class="empty">左の「＋ 区分を追加」から作りましょう。</div>';
     if(cur){const {g,sc,gi}=cur;
@@ -388,7 +428,12 @@ function render(){
 }
 document.addEventListener('input',e=>{
   const t=e.target,d=t.dataset;
-  if(d.w||t.id==='shsel'||t.id==='cgnew'||d.ws!==undefined||d.nk!==undefined)return;
+  if(d.w||t.id==='shsel'||t.id==='cgnew'||d.ws!==undefined||d.nk!==undefined||d.cp!==undefined)return;
+  if(d.aim!==undefined){const [si,cid]=d.aim.split('.'),sc=S.scenes[+si];if(sc){(sc.aims=sc.aims||{})[cid]=t.value;save()}return}
+  if(d.tx!==undefined){const sc=S.scenes.find(x=>x.id===d.tx);if(sc){sc.text=t.value;save();refreshWrite()}return}
+  if(d.st!==undefined){const sc=S.scenes.find(x=>x.id===d.st);if(sc){sc.status=t.value;save();refreshWrite()}return}
+  if(d.gp!==undefined){S.goal=S.goal||{};S.goal.pages=t.value;save();refreshWrite();return}
+  if(d.gd!==undefined){S.goal=S.goal||{};S.goal.deadline=t.value;save();refreshWrite();return}
   if(d.cgn!==undefined){const gi=+d.cgn,old=S.cg[gi],nv=t.value.trim();if(nv&&nv!==old&&!S.cg.includes(nv)){S.cg[gi]=nv;S.chars.forEach(c=>{if((c.grp||'')===old)c.grp=nv});save();refreshList()}return}
   if(d.sn){const s=WL.series.find(x=>x.id===curSid());if(s){s.name=t.value;saveWL()}return}
   if(d.sl!==undefined){SRD.chars[+d.sl].label=t.value;saveSR();return}
@@ -422,6 +467,8 @@ document.addEventListener('click',async e=>{
   if(act==='uscan'){const el=document.getElementById('usage')||{};el.textContent='調べています…';try{el.textContent=await usageText()}catch(e){el.textContent='調べられませんでした'}return}
   if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage')||{};const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
   if(act==='mkexp'){const m=document.getElementById('msg'),o=document.getElementById('out');m.textContent='作成中…';await ensureImgs();o.value=exportJson();m.textContent='作成しました（'+fmt(o.value.length)+'）';return}
+  if(act==='pickw'){SEL.w=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='gobox'){tab='scenes';render();const el=document.getElementById('box-'+b.dataset.id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='cgadd'){const el=document.getElementById('cgnew'),n=el?el.value.trim():'';S.cg=S.cg||[];if(!n||S.cg.includes(n))return;S.cg.push(n);SEL.cg=S.cg.length-1;save();render();return}
@@ -448,13 +495,13 @@ document.addEventListener('click',async e=>{
   if(act==='import'){const m=document.getElementById('in').value.trim();
     try{const j=JSON.parse(m),im=j._imgs||{};delete j._imgs;for(const id in im){IMG[id]=im[id];try{await kvSet('I:'+id,im[id])}catch(x){}}S=Object.assign(blank(),j);migrate();await migImgs();save();tab='ov';render()}catch(x){b.textContent='読み込めませんでした。文字列を確認してください'}}
 });
-document.addEventListener('change',async e=>{const t=e.target;if(t.dataset&&t.dataset.w){switchTo(t.value);return}if(t.dataset&&t.dataset.ws!==undefined){setWorkSeries(t.value);return}if(t.dataset&&t.dataset.sf){toggleField(t.dataset.sf,t.checked);return}if(t.dataset&&t.dataset.nk){ST.nk=t.checked;stSave();render();return}if(t.type!=='file'||!t.dataset.t)return;const o=tgt(t.dataset.t);o.imgs=o.imgs||[];for(const f of t.files){try{const u=await shrink(f),id=newId();IMG[id]=u;kvSet('I:'+id,u).catch(()=>warn(true));o.imgs.push(id)}catch(x){}}savesc(t.dataset.t);render();});
+document.addEventListener('change',async e=>{const t=e.target;if(t.dataset&&t.dataset.w){switchTo(t.value);return}if(t.dataset&&t.dataset.ws!==undefined){setWorkSeries(t.value);return}if(t.dataset&&t.dataset.sf){toggleField(t.dataset.sf,t.checked);return}if(t.dataset&&t.dataset.nk){ST.nk=t.checked;stSave();render();return}if(t.dataset&&t.dataset.cp!==undefined){toggleCp(+t.dataset.cp,t.dataset.cid,t.checked);return}if(t.type!=='file'||!t.dataset.t)return;const o=tgt(t.dataset.t);o.imgs=o.imgs||[];for(const f of t.files){try{const u=await shrink(f),id=newId();IMG[id]=u;kvSet('I:'+id,u).catch(()=>warn(true));o.imgs.push(id)}catch(x){}}savesc(t.dataset.t);render();});
 async function init(){let d=null,wl=null;try{wl=await kvGet('WL')}catch(e){}if(wl&&wl.list&&wl.list.length)WL=wl;else wl=null;try{d=await kvGet('S:'+WL.cur)}catch(e){}if(!d&&!wl){try{d=await kvGet('S')}catch(e){}}
   if(d){S=Object.assign(blank(),d);migrate()}if(!wl&&S.title)WL.list[0].name=S.title;persist();persistWL();
   WL.series=WL.series||[];await loadSR();applyShared();await migImgs();await loadImgs();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   render();setStat(ST.cfg?'接続中…':'同期は未設定です');pull();
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});window.addEventListener('pagehide',flushPersist);document.addEventListener('visibilitychange',()=>{if(document.hidden)flushPersist()});
   window.addEventListener('online',()=>{syncDirty().then(()=>pull())});
   if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})}
 init();
