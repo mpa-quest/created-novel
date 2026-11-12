@@ -110,6 +110,8 @@ div.bx{cursor:default}
 .bar.sb select{max-width:100%}
 .ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
 .usage{white-space:pre-wrap;font-size:14px;line-height:1.8;margin-top:8px}
+.gwrap{overflow-x:auto}.gp{cursor:pointer}
+.ev{display:block;font-size:12px;margin-top:2px;color:var(--sub)}.ev.up{color:var(--up)}.ev.down{color:var(--down)}
 .chk1{display:flex;align-items:center;gap:8px;font-size:15px}.chk1 input{width:auto}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:14px;cursor:pointer;background:var(--surface)}.chip input{width:auto;margin:0}
 .li .lt{flex:1;min-width:0}.cnt{font-size:12px;color:var(--sub);flex:none}.li.on .cnt{color:var(--on)}.cnt.zero{color:var(--down)}
@@ -161,7 +163,7 @@ const KEY='sousaku-note-v1';
 const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],fs:[],goal:{pages:'',deadline:''},notes:''});
 let S=blank(),tab='ov';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(blank(),JSON.parse(r))}catch(e){}
-const migrate=()=>{S.pl=S.pl||{};const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
+const migrate=()=>{S.pl=S.pl||{};(S.scenes||[]).forEach(s=>{if(s.emo!==undefined){if(s.emv===undefined){const m={'＋':5,'－':-5,'±':0};if(m[s.emo]!==undefined)s.emv=m[s.emo]}delete s.emo}});const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('sousaku',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})};
 const kvSet=async(k,v)=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
@@ -335,8 +337,8 @@ const buildDoc=withHeads=>{const T=treeD(),LB=labels(),B=[{t:'title',text:wtitle
 const buildSheets=()=>{const M=METHODS[S.method||'kisho'],T=treeD(),LB=labels(),F=S.fs||[],L=smallsInOrder();
   const nm=s=>LB[s.id]+(s.title?'｜'+s.title:'');
   const fsStr=sid=>{const o=fsOf(sid);return [...o.plant.map(([f,n])=>'◆'+fsNo(n)+' '+(f.title||'')),...o.pay.map(([f,n])=>'◇'+fsNo(n)+' '+(f.title||''))].join(' / ')};
-  const rows=[['構成','大箱','大箱の機能','中箱','シークエンスの役割','小箱','場所','時間','感情の動き','登場人物','このシーンの役割','出来事','状態','文字数','伏線','メモ']];
-  const R=(pn,b,m,s)=>rows.push([pn,b?nm(b):'',b?b.role||'':'',m?nm(m):'',m?m.role||'':'',s?LB[s.id]:'',s?s.place||'':'',s?s.time||'':'',s?s.emo||'':'',s?charNames(s):'',s?s.role||'':'',s?s.event||'':'',s?STN[s.status||'']:'',s?cc(s):'',s?fsStr(s.id):'',s?s.memo||'':'']);
+  const rows=[['構成','大箱','大箱の機能','中箱','シークエンスの役割','小箱','場所','時間','感情の動き（-10〜+10）','登場人物','このシーンの役割','出来事','状態','文字数','伏線','メモ']];
+  const R=(pn,b,m,s)=>rows.push([pn,b?nm(b):'',b?b.role||'':'',m?nm(m):'',m?m.role||'':'',s?LB[s.id]:'',s?s.place||'':'',s?s.time||'':'',s?(evOf(s)==null?'':evOf(s)):'',s?charNames(s):'',s?s.role||'':'',s?s.event||'':'',s?STN[s.status||'']:'',s?cc(s):'',s?fsStr(s.id):'',s?s.memo||'':'']);
   T.nodes.forEach(n=>{const pn=M.p[bigPart(n.s)];if(!n.mid.length&&!n.direct.length)R(pn,n.s,null,null);n.mid.forEach(m=>{if(!m.small.length)R(pn,n.s,m.s,null);m.small.forEach(s=>R(pn,n.s,m.s,s))});n.direct.forEach(s=>R(pn,n.s,null,s))});
   T.oMid.forEach(m=>{if(!m.small.length)R('未所属',null,m.s,null);m.small.forEach(s=>R('未所属',null,m.s,s))});T.oSmall.forEach(s=>R('未所属',null,null,s));
   const keys=CF.filter(f=>f[0]!=='name'),ap={};L.forEach(s=>(s.cids||[]).forEach(id=>{(ap[id]=ap[id]||[]).push(LB[s.id]+'｜'+(sn(s)||s.place||''))}));
@@ -351,6 +353,25 @@ const buildSheets=()=>{const M=METHODS[S.method||'kisho'],T=treeD(),LB=labels(),
   return [{name:'箱書き',rows},{name:'人物',rows:prow},{name:'伏線',rows:frow},{name:'進捗',rows:srow}]};
 const exLinks=r=>'作成しました：<a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+esc(r.name)+'</a>'+(r.pdf?'　<a href="'+esc(r.pdf)+'" target="_blank" rel="noopener">PDF</a>':'')+'\n（ドライブの「創作ノート」→「書き出し」フォルダに入っています）';
 const exportPanel=()=>`<section class="card"><div class="bar"><b>Googleドキュメント・スプレッドシートに書き出す</b></div><p class="hint">いま開いている作品の内容を、ご自身のGoogleドライブに、新しいファイルとして作ります（「創作ノート」→「書き出し」フォルダ）。書き出したファイルを編集しても、アプリには戻りません。${ST.cfg?'':'（Googleドライブ同期を設定すると使えます）'}</p><label class="chk1"><input type="checkbox" data-exo="h" checked> 原稿に、大箱・中箱の見出しを入れる</label><label class="chk1"><input type="checkbox" data-exo="pdf"> 原稿は、PDFも作る</label><p><button class="pri" data-act="exdoc">原稿をGoogleドキュメントに書き出す</button></p><p><button class="pri" data-act="exsheet">箱書き・人物・伏線を、スプレッドシートに書き出す</button></p><div id="exres" class="usage"></div></section>`;
+const evOf=s=>{const v=s.emv;return v===''||v==null||isNaN(+v)?null:Math.max(-10,Math.min(10,Math.round(+v)))};
+const evLab=v=>v==null?'未設定':v>0?'＋'+v:v<0?'－'+Math.abs(v):'0';
+const evOpts=s=>{const cur=evOf(s);let o=`<option value="" ${cur==null?'selected':''}>未設定</option>`;for(let v=10;v>=-10;v--){o+=`<option value="${v}" ${cur===v?'selected':''}>${v===10?'＋10（最高潮）':v===-10?'－10（どん底）':v===0?'0（平常）':evLab(v)}</option>`}return o};
+const evCls=s=>{const v=evOf(s);return v==null||v===0?'':v>0?'up':'down'};
+const evBadge=s=>{const v=evOf(s);return v==null?'':`<span class="ev ${evCls(s)}">感情 ${evLab(v)}</span>`};
+const emoGraph=()=>{const L=smallsInOrder(),LB=labels(),n=L.length;if(!n)return '';
+  const vals=L.map(evOf);
+  if(vals.every(v=>v==null))return `<section class="card"><div class="bar"><b>感情の起伏</b></div><p class="hint">小箱の「感情の動き」（−10〜＋10）を選ぶと、ここに物語の起伏がグラフで表示されます。</p></section>`;
+  const W=Math.max(640,n*44+80),H=300,pl=44,pr=16,pt=26,pb=34,iw=W-pl-pr,ih=H-pt-pb,X=k=>pl+(n===1?iw/2:iw*(k+0.5)/n),Y=v=>pt+ih*(10-v)/20,y0=Y(0);
+  const T=treeD(),g=[];let idx=0;T.nodes.forEach(nd=>{const cnt=nd.mid.reduce((a,m)=>a+m.small.length,0)+nd.direct.length;if(cnt){g.push({k:LB[nd.s.id].replace('大箱 ',''),a:idx,b:idx+cnt});idx+=cnt}});
+  if(n>idx)g.push({k:'未所属',a:idx,b:n});
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="感情の起伏のグラフ">`;
+  g.forEach((o,i)=>{const x1=pl+iw*o.a/n,x2=pl+iw*o.b/n;svg+=`<rect x="${x1}" y="${pt}" width="${x2-x1}" height="${ih}" style="fill:var(--soft);opacity:${i%2?0:.6}"/><text x="${(x1+x2)/2}" y="${H-10}" text-anchor="middle" font-size="12" style="fill:var(--sub)">${esc(o.k)}</text>`});
+  [10,5,0,-5,-10].forEach(v=>{svg+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)" stroke-width="${v===0?1.5:1}" ${v===0?'':'stroke-dasharray="3 3"'}/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" style="fill:var(--sub)">${v>0?'+'+v:v}</text>`});
+  const pts=L.map((s,k)=>vals[k]==null?null:[X(k),Y(vals[k]),s,vals[k]]).filter(Boolean);
+  if(pts.length>1)svg+=`<path d="M${pts[0][0]},${y0}${pts.map(p=>' L'+p[0]+','+p[1]).join('')} L${pts[pts.length-1][0]},${y0} Z" style="fill:var(--c1);opacity:.18"/><polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" style="stroke:var(--c1)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  pts.forEach(p=>{const c=p[3]>0?'var(--up)':p[3]<0?'var(--down)':'var(--mid)';svg+=`<g class="gp" data-id="${p[2].id}"><circle cx="${p[0]}" cy="${p[1]}" r="6" style="fill:${c};stroke:var(--surface)" stroke-width="2"><title>${esc(LB[p[2].id])}｜${esc(sn(p[2])||p[2].place||'')}：${evLab(p[3])}</title></circle></g>`});
+  svg+='</svg>';
+  return `<section class="card"><div class="bar"><b>感情の起伏</b></div><div class="gwrap">${svg}</div><p class="hint">点は小箱です（押すと、その小箱の箱書きに移ります）。横軸は物語の順番、下の名前は大箱です。縦軸は感情の動きで、＋10が最高潮、−10がどん底です。未設定の小箱には、点がありません。</p></section>`};
 const syncPanel=()=>{const c=ST.cfg||{};return `<section class="card"><div class="bar"><b>Googleドライブ同期</b></div><label class="f"><span>ウェブアプリのURL（末尾が /exec）</span><input id="su" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><label class="f"><span>合言葉（GASのスクリプトプロパティ TOKEN と同じもの）</span><input id="st" type="password" value="${esc(c.token)}" autocomplete="off"></label><p><button class="pri" data-act="scfg">保存して同期</button></p><p><button class="sec" data-act="spull">サーバーから読み込む</button> <button class="sec" data-act="spush">この端末で上書き</button></p><p class="hint" id="sync2">${esc(SS)}</p></section>`};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -417,9 +438,9 @@ const VIEWS={
     ta('定着・余韻（ラストの着地点）','data-p="ov.ending"',S.ov.ending,2),
   plot:()=>{const m=S.method||'kisho',M=METHODS[m],P=S.pl[m]||[];return msel()+`<p class="hint">${M.n}ごとに、物語の流れを大きくつかみます。</p>`+M.p.map((n,k)=>ta(n+'｜'+M.s[k],`data-pl="${k}"`,P[k]||'',4)).join('')},
   scenes:()=>{const T=treeD(),LB=labels(),M=METHODS[S.method||'kisho'];
-    const card=s=>{const i=S.scenes.indexOf(s),lv=lvOf(s),a=`data-a="scenes" data-i="${i}"`,c=lv===3?(s.emo==='＋'?'up':s.emo==='－'?'down':''):'';
+    const card=s=>{const i=S.scenes.indexOf(s),lv=lvOf(s),a=`data-a="scenes" data-i="${i}"`,c=lv===3?evCls(s):'';
       const body=lv===3?`<div class="row3">${ip('場所',a+' data-k="place"',s.place)}${ip('時間',a+' data-k="time"',s.time)}
-      <label class="f"><span>感情の動き</span><select ${a} data-k="emo">${['','＋','－','±'].map(o=>`<option value="${o}" ${s.emo===o?'selected':''}>${o||'未設定'}</option>`).join('')}</select></label></div>
+      <label class="f"><span>感情の動き（−10〜＋10）</span><select ${a} data-k="emv">${evOpts(s)}</select></label></div>
       ${ta('このシーンの役割（物語の中で果たす働き）',a+' data-k="role"',s.role,2)}
       ${charPick(s,i)}
       ${ip('その他の登場人物（人物タブにいない人）',a+' data-k="chars"',s.chars)}
@@ -431,7 +452,7 @@ const VIEWS={
       ${ta(lv===1?'この大箱で描くこと':'この中箱で描くこと',a+' data-k="event"',s.event,2)}
       ${ta('メモ',a+' data-k="memo"',s.memo,2)}`;
       return `<section class="card lv${lv} ${c}" id="box-${s.id}">${sbar(i,LB[s.id])}${body}</section>`};
-    let h=msel()+`<p class="hint">構成（${M.n}）ごとに大箱を置き、大箱の下に中箱、中箱の下に小箱をつなげます。「＋ 中箱をこの大箱に追加」などで、つなげた状態で追加できます。つなぎ先は、各カードの「所属」の欄で変えられます。↑ ↓ は、同じ親・同じ構成の中で順番を入れ替えます。小箱は全${S.scenes.filter(s=>lvOf(s)===3).length}。</p><p class="hint">色：<span class="lg c1">大箱</span><span class="lg c2">中箱</span><span class="lg c3">小箱</span>　小箱の右端の色は、感情の動き（緑＝上がる／赤＝下がる）です。</p>`;
+    let h=msel()+`<p class="hint">構成（${M.n}）ごとに大箱を置き、大箱の下に中箱、中箱の下に小箱をつなげます。「＋ 中箱をこの大箱に追加」などで、つなげた状態で追加できます。つなぎ先は、各カードの「所属」の欄で変えられます。↑ ↓ は、同じ親・同じ構成の中で順番を入れ替えます。小箱は全${S.scenes.filter(s=>lvOf(s)===3).length}。</p><p class="hint">色：<span class="lg c1">大箱</span><span class="lg c2">中箱</span><span class="lg c3">小箱</span>　小箱の右端の色は、感情の動き（−10〜＋10。プラスは緑、マイナスは赤）です。</p>`;
     M.p.forEach((pn,pi)=>{h+=`<div class="ph"><b>${esc(pn)}</b><span>${esc(M.s[pi])}</span><button class="sec c1b" data-act="addbig" data-part="${pi}">＋ 大箱を追加</button></div>`;
       T.nodes.filter(n=>bigPart(n.s)===pi).forEach(n=>{h+=card(n.s);n.mid.forEach(m=>{h+=card(m.s);m.small.forEach(x=>{h+=card(x)});h+=`<button class="add sm ind2" data-act="addchild" data-pid="${m.s.id}" data-lv="3">＋ 小箱をこの中箱に追加</button>`});n.direct.forEach(x=>{h+=card(x)});h+=`<button class="add sm ind1" data-act="addchild" data-pid="${n.s.id}" data-lv="2">＋ 中箱をこの大箱に追加</button>`})});
     if(T.oMid.length||T.oSmall.length){h+=`<div class="ph"><b>未所属の箱</b><span>「所属」を選ぶと、構成に入ります</span></div>`;T.oMid.forEach(m=>{h+=card(m.s);m.small.forEach(x=>{h+=card(x)})});T.oSmall.forEach(x=>{h+=card(x)})}
@@ -453,11 +474,11 @@ const VIEWS={
     const gt=`style="grid-template-columns:repeat(${cols.length},minmax(78px,1fr))"`;
     const big=c=>c.a?`<button class="bx b1${X[c.a.k]?' on':''}" data-act="xp" data-k="${c.a.k}" aria-expanded="${!!X[c.a.k]}"><b>${c.n}</b><em>${esc(c.a.s&&(c.a.s.title||c.a.s.event))}</em><i>${X[c.a.k]?'▾':'▸'} 中箱 ${c.a.ch.length}</i></button>`:`<div class="bx ph"><b>${c.n}</b><em>大箱なし</em></div>`;
     const c2=m=>`<button class="bx b2${X[m.k]?' on':''}" data-act="xp" data-k="${m.k}" aria-expanded="${!!X[m.k]}"><b>${esc(m.s&&m.s.title)||'シークエンス'}</b><em>${esc(m.s&&m.s.event)}</em><i>${X[m.k]?'▾':'▸'} 小箱 ${m.ch.length}</i></button>`;
-    const c3=x=>{const s=x.s;return `<div class="bx b3 ${s.emo==='＋'?'up':s.emo==='－'?'down':''}"><b>${esc(s.place)||'シーン'}${s.time?'・'+esc(s.time):''}</b><em>${esc(s.event)}</em><i>${esc(charNames(s))}</i>${fsMark(s.id)}</div>`};
+    const c3=x=>{const s=x.s;return `<div class="bx b3 ${evCls(s)}"><b>${esc(s.place)||'シーン'}${s.time?'・'+esc(s.time):''}</b><em>${esc(s.event)}</em><i>${esc(charNames(s))}</i>${fsMark(s.id)}${evBadge(s)}</div>`};
     const ex=c=>{if(!c.a||!X[c.a.k])return '';return `<div class="lvl"><span class="tag">中箱｜${c.n}</span><div class="chs">${c.a.ch.map(c2).join('')||'<p class="mut">中箱がありません</p>'}</div></div>`+c.a.ch.filter(m=>X[m.k]).map(m=>`<div class="lvl l3"><span class="tag">小箱｜${esc(m.s&&m.s.title)||'シークエンス'}</span><div class="chs">${m.ch.map(c3).join('')||'<p class="mut">小箱がありません</p>'}</div></div>`).join('')};
     const tc=(l,v,c)=>`<div class="tc ${c||''}"><b>${l}</b>${v?`<span>${esc(v)}</span>`:'<span class="mut">未入力</span>'}</div>`;
     const top=`<div class="top"><svg class="mtn" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40L8 33L14 36L24 20L30 27L42 10L48 18L60 5L70 16L82 2L100 40Z"/></svg><div class="r1">${tc('アンチテーゼ',O.anti,'g')}<div class="ar"><i>◀</i><i>▶</i></div>${tc('テーマ',O.theme,'g')}</div><div class="r1">${tc('天地人',O.tcj)}${tc('障害：事件・事情・事実',O.conflict)}${tc('定着・余韻',O.ending)}</div><div class="r1">${tc('欲望',O.want)}<div class="ar"><i></i><span class="pill">貫通行動${O.thru?'：'+esc(O.thru):''}</span><i>▶</i></div>${tc('目的',O.goal)}</div></div>`;
-    return msel()+`<p class="hint">${S.scenes.length?'入力したデータをシートの形で確認します。大箱・中箱をタップすると、下の階層が展開されます。編集は各タブで行います。◆＝伏線を張る、◇＝回収です（番号は伏線タブと同じ）。':'箱書きタブで大箱・中箱・小箱をつくると、ここに並びます。'}</p><div class="sheet"><div class="sin">${top}<div class="gr" ${gt}>${bands.join('')}</div><div class="gr" ${gt}>${cols.map(big).join('')}</div>${cols.map(ex).join('')}</div></div><p class="note">大箱＝構成上の機能／中箱＝シークエンスの役割／小箱＝その役割とキャラクター</p>`},
+    return msel()+`<p class="hint">${S.scenes.length?'入力したデータをシートの形で確認します。大箱・中箱をタップすると、下の階層が展開されます。編集は各タブで行います。◆＝伏線を張る、◇＝回収です（番号は伏線タブと同じ）。':'箱書きタブで大箱・中箱・小箱をつくると、ここに並びます。'}</p>${emoGraph()}<div class="sheet"><div class="sin">${top}<div class="gr" ${gt}>${bands.join('')}</div><div class="gr" ${gt}>${cols.map(big).join('')}</div>${cols.map(ex).join('')}</div></div><p class="note">大箱＝構成上の機能／中箱＝シークエンスの役割／小箱＝その役割とキャラクター</p>`},
   fs:()=>{const F=S.fs||[];if(!F.some(x=>x.id===SEL.f))SEL.f=F.length?F[0].id:null;const L=smallsInOrder(),LB=labels(),cnt={bad:0,warn:0,ok:0};F.forEach(f=>{cnt[fsInfo(f).st]++});
     const f=F.find(x=>x.id===SEL.f);let det='<div class="empty">左の「＋ 伏線を追加」から作るか、箱書きの小箱のカードで伏線を張ってください。</div>';
     if(f){const no=fsNo(F.indexOf(f)),inf=fsInfo(f);
@@ -517,11 +538,12 @@ document.addEventListener('input',e=>{
   else if(d.pl!==undefined){const m=S.method||'kisho';(S.pl[m]=S.pl[m]||[])[+d.pl]=t.value}
   else if(d.r){const [sc,c,i]=d.r.split('.');R(sc)[+c].items[+i][d.rk]=t.value;touchR(sc);refreshList();return}
   else if(d.x){const [i,j]=d.x.split('.');S.chars[i].extra[j][d.xk]=t.value}
-  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.a==='scenes'&&d.k==='lv')relink(+d.i);if(d.k==='emo'||d.k==='lv'||d.k==='pid'||d.k==='part')render();}
+  else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.a==='scenes'&&d.k==='lv')relink(+d.i);if(d.k==='emv'){const y=window.scrollY;render();window.scrollTo(0,y)}else if(d.k==='lv'||d.k==='pid'||d.k==='part')render();}
   save();
 });
 document.addEventListener('click',async e=>{document.querySelectorAll('details.msel[open]').forEach(dt=>{if(!dt.contains(e.target))dt.open=false});
   const im=e.target.closest('.im img');if(im){im.classList.toggle('big');return}
+  const gp=e.target.closest('.gp');if(gp){tab='scenes';render();const el=document.getElementById('box-'+gp.dataset.id);if(el)el.scrollIntoView({block:'center'});return}
   const b=e.target.closest('button');if(!b||!b.dataset.act)return;
   const {act,k}=b.dataset,i=+b.dataset.i;
   if(act==='snew'){const id='sr'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);WL.series.push({id,name:''});saveWL();await setWorkSeries(id);return}
@@ -551,8 +573,8 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='fsnew1'){const s=S.scenes[i],el=document.getElementById('fs-new-'+i),n=el?el.value.trim():'';if(!s||!n)return;S.fs=S.fs||[];S.fs.push({id:uid(),title:n,note:'',plant:[s.id],pay:[]});save();const y=window.scrollY;render();window.scrollTo(0,y);return}
   if(act==='pickw'){SEL.w=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
   if(act==='gobox'){tab='scenes';render();const el=document.getElementById('box-'+b.dataset.id);if(el)el.scrollIntoView({block:'center'});return}
-  if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
-  if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
+  if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
+  if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='cgadd'){const el=document.getElementById('cgnew'),n=el?el.value.trim():'';S.cg=S.cg||[];if(!n||S.cg.includes(n))return;S.cg.push(n);SEL.cg=S.cg.length-1;save();render();return}
   if(act==='cgtog'){const n=(S.cg||[])[+b.dataset.g];cgOpen[n]=cgOpen[n]===false;refreshList();return}
   if(act==='cgup'||act==='cgdown'){const g=+b.dataset.g,j=act==='cgup'?g-1:g+1;if(j<0||j>=S.cg.length)return;[S.cg[g],S.cg[j]]=[S.cg[j],S.cg[g]];SEL.cg=j;save();render();return}
@@ -567,7 +589,7 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='xadd'){const c=S.chars[i];(c.extra=c.extra||[]).push({k:'',v:''});save();render();const el=document.querySelector('[data-x="'+i+'.'+(c.extra.length-1)+'"][data-xk="k"]');if(el)el.focus();return}
   if(act==='xdel'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}S.chars[i].extra.splice(+b.dataset.j,1);save();render();return}
   if(act==='tab'){tab=k;render();return}
-  if(act==='add'){if(k==='chars'){NEWGRP=cgSel()>=0?S.cg[cgSel()]:((S.chars[selChar()]||{}).grp||'');SEL.chars=S.chars.length;SEL.cg=-1}S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:'',grp:NEWGRP||''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
+  if(act==='add'){if(k==='chars'){NEWGRP=cgSel()>=0?S.cg[cgSel()]:((S.chars[selChar()]||{}).grp||'');SEL.chars=S.chars.length;SEL.cg=-1}S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:'',grp:NEWGRP||''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
   if(act==='up'||act==='down'){if(k==='scenes'){const j=sibIdx(i,act==='up'?-1:1);if(j>=0){const L=S.scenes;[L[i],L[j]]=[L[j],L[i]]}}else{const j=act==='up'?i-1:i+1;[S[k][i],S[k][j]]=[S[k][j],S[k][i]];if(k==='chars')SEL.chars=j}save();render();return}
   if(act==='del'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}
     S[k].splice(i,1);save();render();return}
