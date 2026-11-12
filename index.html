@@ -149,7 +149,7 @@ const defaultWL=()=>({cur:'main',list:[{id:'main',name:''}],series:[]});
 let WL=defaultWL();
 const persist=()=>{kvSet('S:'+WL.cur,S).then(()=>warn(false)).catch(()=>warn(true))};
 const persistWL=()=>{kvSet('WL',WL).catch(()=>warn(true))};
-const SK='sousaku-sync-v1',ST={cfg:null,srv:{},dirty:{},up:{},nk:false};
+const SK='sousaku-sync-v1',ST={cfg:null,srv:{},dirty:{},up:{},nk:false,del:[]};
 try{Object.assign(ST,JSON.parse(localStorage.getItem(SK)||'{}'))}catch(e){}
 if(typeof ST.srv!=='object'||ST.srv===null)ST.srv={main:ST.srv||0};
 if(typeof ST.dirty!=='object'||ST.dirty===null)ST.dirty={main:!!ST.dirty};
@@ -164,7 +164,7 @@ const getData=async id=>id==='index'?{list:WL.list,series:WL.series}:id===WL.cur
 const wname=id=>{const w=WL.list.find(x=>x.id===id);return (w&&w.name)||'（無題）'};
 const conflictMsg=id=>'競合：'+(id==='index'?'作品一覧':'「'+wname(id)+'」')+'は別の端末でも更新されています。「保存」タブで選んでください';
 const push=async(id,force)=>{id=id||WL.cur;if(!ST.cfg)return;setStat('同期中…');try{const data=await getData(id);if(!data)return;if(id!=='index'&&!(await uploadImgs(data))){setStat('画像の送信に失敗しました（あとで再試行します）');return}const r=await call({id,op:'put',data,base:force?-1:(ST.srv[id]||0)});if(r.ok){ST.srv[id]=r.updated;ST.dirty[id]=false;stSave();setStat('同期済み')}else if(r.error==='conflict')setStat(conflictMsg(id));else setStat('同期エラー：'+r.error)}catch(e){setStat('オフライン（あとで同期します）')}};
-const syncDirty=async()=>{if(!ST.cfg)return;for(const id of ['index',...WL.list.map(w=>w.id),...WL.series.map(s=>s.id)])if(ST.dirty[id])await push(id)};
+const syncDirty=async()=>{if(!ST.cfg)return;await flushDel();for(const id of ['index',...WL.list.map(w=>w.id),...WL.series.map(s=>s.id)])if(ST.dirty[id])await push(id)};
 const localHas=async id=>{if(id==='index')return JSON.stringify([WL.list,WL.series])!==JSON.stringify([defaultWL().list,[]]);if(id.startsWith('sr')){if(id===curSid())return JSON.stringify(SRD)!==JSON.stringify(normSR(null));try{return !!(await kvGet('SR:'+id))}catch(e){return false}}if(id===WL.cur)return JSON.stringify(S)!==JSON.stringify(blank());try{return !!(await kvGet('S:'+id))}catch(e){return false}};
 const loadCur=async()=>{let d=null;try{d=await kvGet('S:'+WL.cur)}catch(e){}S=d?Object.assign(blank(),d):blank();SEL.chars=0;SEL.cg=-1;SEL.r={sc:'w',gi:0,ii:-1};migrate();await loadSR();applyShared();await migImgs();await loadImgs()};
 const applyDoc=async(id,data)=>{
@@ -186,7 +186,7 @@ const pull=async force=>{if(!ST.cfg)return;await pullDoc('index');if(curSid())aw
 const flushCur=async()=>{try{await kvSet('S:'+WL.cur,S)}catch(e){}if(ST.cfg&&ST.dirty[WL.cur])await push(WL.cur);const sd=curSid();if(ST.cfg&&sd&&ST.dirty[sd])await push(sd)};
 const switchTo=async id=>{if(id===WL.cur)return;await flushCur();WL.cur=id;persistWL();await loadCur();tab='ov';render();const sd=curSid();if(sd)await pullDoc(sd);await pullDoc(id);fetchMissing()};
 const newWork=async()=>{await flushCur();const sd=curSid(),id='w'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);WL.list.push(sd?{id,name:'',sid:sd}:{id,name:''});WL.cur=id;S=blank();SEL.chars=0;SEL.cg=-1;SEL.r={sc:'w',gi:0,ii:-1};await loadSR();persistWL();persist();touch('index');touch(id);tab='ov';render()};
-const delWork=async()=>{if(WL.list.length<2)return;const id=WL.cur;WL.list=WL.list.filter(w=>w.id!==id);WL.cur=WL.list[0].id;try{await kvDel('S:'+id)}catch(e){}delete ST.dirty[id];delete ST.srv[id];stSave();persistWL();touch('index');if(ST.cfg)call({id,op:'del'}).catch(()=>{});await loadCur();tab='ov';render()};
+const delWork=async()=>{if(WL.list.length<2)return;const id=WL.cur,ids=refIds(S);WL.list=WL.list.filter(w=>w.id!==id);WL.cur=WL.list[0].id;try{await kvDel('S:'+id)}catch(e){}delete ST.dirty[id];delete ST.srv[id];queueDel(id);persistWL();touch('index');await loadCur();await dropLocalImgs(ids);tab='ov';render();flushDel()};
 const renderWbar=()=>{const e=document.getElementById('wbar');if(!e)return;e.innerHTML=`<select data-w="1" id="wsel" aria-label="作品">${WL.list.map(w=>`<option value="${w.id}" ${w.id===WL.cur?'selected':''}>${esc(w.name)||'（無題）'}</option>`).join('')}</select><button class="sec" data-act="wnew">＋ 新しい作品</button><button class="sec" data-act="wdel" ${WL.list.length<2?'disabled':''}>この作品を削除</button>`};
 const BLANK="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23ccd3da'/%3E%3C/svg%3E";
 const IMG={};let fm=false;
@@ -252,10 +252,14 @@ const usageText=async()=>{const u=await calcUsage(),L=[];
   L.push('');L.push('※サイズは目安です。実際のディスク使用量とは少し異なります。');
   return L.join('\n')};
 const cleanLocal=async()=>{let n=0,bytes=0;const rows=await kvScan();for(const [k,s] of rows){if(k.startsWith('I:')&&ST.up[k.slice(2)]){await kvDel(k);n++;bytes+=s}}return {n,bytes}};
+const localRefs=async()=>{const set=new Set();for(const [k] of await kvScan()){if(k.startsWith('S:')||k.startsWith('SR:')){try{const d=await kvGet(k);if(d)refIds(d).forEach(x=>set.add(x))}catch(e){}}}refIds(S).forEach(x=>set.add(x));if(SRD)refIds(SRD).forEach(x=>set.add(x));return set};
+const dropLocalImgs=async ids=>{const keep=await localRefs();for(const id of ids){if(!keep.has(id)){try{await kvDel('I:'+id)}catch(e){}delete IMG[id];delete ST.up[id]}}stSave()};
+const queueDel=id=>{ST.del=ST.del||[];if(!ST.del.includes(id))ST.del.push(id);stSave()};
+const flushDel=async()=>{if(!ST.cfg||!ST.del||!ST.del.length)return;let all=true;for(const id of [...ST.del]){try{const r=await call({id,op:'del'});if(r.ok)ST.del=ST.del.filter(x=>x!==id);else all=false}catch(e){all=false}}stSave();if(all){try{await call({op:'gc'})}catch(e){}}};
 const ensureImgs=async()=>{for(const id of refIds()){if(IMG[id])continue;let v=null;try{v=await kvGet('I:'+id)}catch(e){}if(!v&&ST.cfg){try{const r=await call({op:'imgget',iid:id});if(r.ok&&r.data)v=r.data}catch(e){}}if(v)IMG[id]=v}};
 let fv=false,fvAgain=false;
 const fetchVisible=async()=>{if(fv){fvAgain=true;return}fv=true;try{do{fvAgain=false;for(const el of [...document.querySelectorAll('img[data-iid]')]){const id=el.dataset.iid;if(IMG[id]){if(el.src!==IMG[id])el.src=IMG[id];continue}let v=null;try{v=await kvGet('I:'+id)}catch(e){}if(!v&&ST.cfg){try{const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){v=r.data;ST.up[id]=1;stSave();if(!ST.nk)kvSet('I:'+id,v).catch(()=>{})}}catch(e){}}if(v){IMG[id]=v;setImg(id)}}}while(fvAgain)}finally{fv=false}};
-const devicePanel=()=>`<section class="card"><div class="bar"><b>この端末の容量</b></div><label class="chk1"><input type="checkbox" data-nk="1" ${ST.nk?'checked':''} ${ST.cfg?'':'disabled'}> この端末に画像を残さない</label><p class="hint">オンにすると、画像は見る時にドライブから取り出し、端末には保存しません。端末の容量は、文章のデータだけになります。画像の表示に通信が必要で、オフラインでは見られません。${ST.cfg?'':'（Googleドライブ同期を設定すると選べます）'}初期設定は、画像を端末に残す（オフ）です。</p><p><button class="sec" data-act="uclean">端末内の送信済みの画像を消す</button></p><p><button class="sec" data-act="uscan">容量を調べる</button></p><div id="usage" class="usage"></div></section>`;
+const devicePanel=()=>`<section class="card"><div class="bar"><b>この端末の容量</b></div><label class="chk1"><input type="checkbox" data-nk="1" ${ST.nk?'checked':''} ${ST.cfg?'':'disabled'}> この端末に画像を残さない</label><p class="hint">オンにすると、画像は見る時にドライブから取り出し、端末には保存しません。端末の容量は、文章のデータだけになります。画像の表示に通信が必要で、オフラインでは見られません。${ST.cfg?'':'（Googleドライブ同期を設定すると選べます）'}初期設定は、画像を端末に残す（オフ）です。</p><p><button class="sec" data-act="uclean">端末内の送信済みの画像を消す</button></p><p><button class="sec" data-act="ugc">使われていない画像を整理する</button></p><p><button class="sec" data-act="uscan">容量を調べる</button></p><div id="usage" class="usage"></div></section>`;
 const syncPanel=()=>{const c=ST.cfg||{};return `<section class="card"><div class="bar"><b>Googleドライブ同期</b></div><label class="f"><span>ウェブアプリのURL（末尾が /exec）</span><input id="su" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><label class="f"><span>合言葉（GASのスクリプトプロパティ TOKEN と同じもの）</span><input id="st" type="password" value="${esc(c.token)}" autocomplete="off"></label><p><button class="pri" data-act="scfg">保存して同期</button></p><p><button class="sec" data-act="spull">サーバーから読み込む</button> <button class="sec" data-act="spush">この端末で上書き</button></p><p class="hint" id="sync2">${esc(SS)}</p></section>`};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -403,7 +407,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b||!b.dataset.act)return;
   const {act,k}=b.dataset,i=+b.dataset.i;
   if(act==='snew'){const id='sr'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);WL.series.push({id,name:''});saveWL();await setWorkSeries(id);return}
-  if(act==='sdel'){if(!arm(b,'このシリーズを削除','共有している人物と資料も削除されます。もう一度押す'))return;const id=curSid();WL.series=WL.series.filter(s=>s.id!==id);WL.list.forEach(w=>{if(w.sid===id)delete w.sid});S.chars.forEach(c=>{delete c.sid});SRD=null;try{await kvDel('SR:'+id)}catch(e){}delete ST.dirty[id];delete ST.srv[id];stSave();saveWL();save();if(ST.cfg)call({id,op:'del'}).catch(()=>{});render();return}
+  if(act==='sdel'){if(!arm(b,'このシリーズを削除','共有している人物と資料を、端末とGoogleドライブの両方から削除します。もう一度押す'))return;const id=curSid(),ids=SRD?refIds(SRD):[];WL.series=WL.series.filter(s=>s.id!==id);WL.list.forEach(w=>{if(w.sid===id)delete w.sid});S.chars.forEach(c=>{delete c.sid});SRD=null;try{await kvDel('SR:'+id)}catch(e){}delete ST.dirty[id];delete ST.srv[id];stSave();saveWL();save();queueDel(id);await dropLocalImgs(ids);render();flushDel();return}
   if(act==='scdel'){if(!arm(b,'削除'))return;const sc=SRD.chars[i];S.chars.forEach(c=>{if(c.sid===sc.id)delete c.sid});SRD.chars.splice(i,1);saveSR();save();render();return}
   if(act==='chshare'){const c=S.chars[i],sc={id:'sc'+uid(),label:c.name||'人物',vals:{}};SRD.sharedFields.forEach(k=>{sc.vals[k]=c[k]||''});SRD.chars.push(sc);c.sid=sc.id;saveSR();save();render();return}
   if(act==='chdetach'){delete S.chars[i].sid;save();render();return}
@@ -414,8 +418,9 @@ document.addEventListener('click',async e=>{
   if(act==='ridel'){if(!arm(b,'削除'))return;R(b.dataset.s)[i].items.splice(+b.dataset.j,1);touchR(b.dataset.s);SEL.r.ii=-1;render();return}
   if(act==='gmove'){const sc=b.dataset.s;if(sc==='s'&&!arm(b,'この作品だけにする','他の作品からは見えなくなります。もう一度押す'))return;const [g]=R(sc).splice(i,1);const tg=sc==='s'?'w':'s';R(tg).push(g);SEL.r={sc:tg,gi:R(tg).length-1,ii:-1};save();saveSR();render();return}
   if(act==='pick'){if(b.dataset.t==='chars'){SEL.chars=i;SEL.cg=-1}else if(b.dataset.t==='cg')SEL.cg=+b.dataset.g;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
-  if(act==='uscan'){const el=document.getElementById('usage');el.textContent='調べています…';try{el.textContent=await usageText()}catch(e){el.textContent='調べられませんでした'}return}
-  if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage');const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
+  if(act==='ugc'){if(!arm(b,'使われていない画像を整理する','どの作品でも使われていない画像を、端末とドライブから消します（ドライブはゴミ箱へ。24時間以内に追加した画像は対象外）。もう一度押す'))return;const el=document.getElementById('usage')||{};el.textContent='整理しています…';let nL=0,bL=0;try{const keep=await localRefs();for(const [k,s] of await kvScan()){if(k.startsWith('I:')&&!keep.has(k.slice(2))){await kvDel(k);nL++;bL+=s}}}catch(e){}let msg='端末内：使われていない画像 '+nL+'枚（'+fmt(bL)+'）を消しました。';if(ST.cfg){try{await flushDel();const r=await call({op:'gc'});msg+='\nドライブ：'+(r.ok?'使われていない画像 '+r.trashed+'枚（'+fmt(r.bytes)+'）をゴミ箱に移しました。':'整理できませんでした（'+r.error+'）。GASを最新の Code.gs に更新してください。')}catch(e){msg+='\nドライブ：通信できませんでした。'}}el.textContent=msg;return}
+  if(act==='uscan'){const el=document.getElementById('usage')||{};el.textContent='調べています…';try{el.textContent=await usageText()}catch(e){el.textContent='調べられませんでした'}return}
+  if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage')||{};const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
   if(act==='mkexp'){const m=document.getElementById('msg'),o=document.getElementById('out');m.textContent='作成中…';await ensureImgs();o.value=exportJson();m.textContent='作成しました（'+fmt(o.value.length)+'）';return}
   if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emo:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
@@ -424,7 +429,7 @@ document.addEventListener('click',async e=>{
   if(act==='cgup'||act==='cgdown'){const g=+b.dataset.g,j=act==='cgup'?g-1:g+1;if(j<0||j>=S.cg.length)return;[S.cg[g],S.cg[j]]=[S.cg[j],S.cg[g]];SEL.cg=j;save();render();return}
   if(act==='cgdel'){if(!arm(b,'区分を削除'))return;const g=+b.dataset.g,n=S.cg[g];S.chars.forEach(c=>{if((c.grp||'')===n)c.grp=''});S.cg.splice(g,1);SEL.cg=-1;save();render();return}
   if(act==='wnew'){newWork();return}
-  if(act==='wdel'){if(!arm(b,'この作品を削除','この作品を削除します。もう一度押す'))return;delWork();return}
+  if(act==='wdel'){if(!arm(b,'この作品を削除','この作品を、端末とGoogleドライブの両方から削除します（ドライブはゴミ箱に移ります）。もう一度押す'))return;delWork();return}
   if(act==='scfg'){const u=document.getElementById('su').value.trim(),t=document.getElementById('st').value;ST.cfg=u&&t?{url:u,token:t}:null;stSave();setStat(ST.cfg?'接続中…':'同期は未設定です');pull();return}
   if(act==='spull'){if(!arm(b,'サーバーから読み込む','この端末の内容が置き換わります。もう一度押す'))return;pull(true);return}
   if(act==='spush'){if(!arm(b,'この端末で上書き','サーバーの内容が置き換わります。もう一度押す'))return;push(WL.cur,true);return}
