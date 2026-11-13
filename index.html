@@ -112,6 +112,8 @@ div.bx{cursor:default}
 .usage{white-space:pre-wrap;font-size:14px;line-height:1.8;margin-top:8px}
 .gwrap{overflow-x:auto}.gp{cursor:pointer}
 .ev{display:block;font-size:12px;margin-top:2px;color:var(--sub)}.ev.up{color:var(--up)}.ev.down{color:var(--down)}
+.modebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.modebar .hint{margin:0}
+.ro{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:2.2em}.ro.mut{color:var(--sub);opacity:.8}
 .chk1{display:flex;align-items:center;gap:8px;font-size:15px}.chk1 input{width:auto}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:14px;cursor:pointer;background:var(--surface)}.chip input{width:auto;margin:0}
 .li .lt{flex:1;min-width:0}.cnt{font-size:12px;color:var(--sub);flex:none}.li.on .cnt{color:var(--on)}.cnt.zero{color:var(--down)}
@@ -225,12 +227,14 @@ const setImg=id=>document.querySelectorAll('img[data-iid="'+id+'"]').forEach(im=
 const uploadImgs=async d=>{for(const id of refIds(d)){if(ST.up[id])continue;const v=IMG[id]||await kvGet('I:'+id);if(!v)continue;const r=await call({op:'imgput',iid:id,data:v});if(!r.ok)return false;ST.up[id]=1;stSave();if(ST.nk)kvDel('I:'+id).catch(()=>{})}return true};
 const fetchMissing=async()=>{if(!ST.cfg||fm||ST.nk)return;fm=true;try{for(const id of allIds()){if(IMG[id])continue;const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){IMG[id]=r.data;ST.up[id]=1;kvSet('I:'+id,r.data).catch(()=>{});setImg(id)}}stSave()}catch(e){}fm=false};
 const exportJson=()=>JSON.stringify(Object.assign({},S,{_imgs:Object.fromEntries(refIds().filter(id=>IMG[id]).map(id=>[id,IMG[id]]))}));
+let RO=false,lastTab=null;const EDIT={ov:false,plot:false,chars:false,refs:false};
+const modeBar=()=>`<div class="modebar"><button class="sec" data-act="mode">${RO?'✎ 編集モードにする':'閲覧モードにする'}</button><span class="hint">${RO?'いまは閲覧モードです。長い文章も、そのまま読めます。':'いまは編集モードです。'}</span></div>`;
 const SEL={chars:0,cg:-1,w:null,f:null,r:{sc:'w',gi:0,ii:-1}};
 const selChar=()=>{const n=S.chars.length;if(SEL.chars>=n)SEL.chars=n-1;if(SEL.chars<0)SEL.chars=0;return SEL.chars};
 const cgOpen={};let NEWGRP='';
 const cgSel=()=>{const g=S.cg||[];return SEL.cg>=0&&SEL.cg<g.length?SEL.cg:-1};
-const grpSel=(c,i)=>(S.cg&&S.cg.length)?`<label class="f"><span>区分</span><select data-a="chars" data-i="${i}" data-k="grp"><option value="">未分類</option>${S.cg.map(n=>`<option value="${esc(n)}" ${c.grp===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:'';
-const cgDetail=()=>{const gi=cgSel();if(gi<0)return '';const G=S.cg,n=G[gi],cnt=S.chars.filter(x=>(x.grp||'')===n).length;return `<section class="card"><div class="bar sb"><b>区分</b><button data-act="cgup" data-g="${gi}" ${gi===0?'disabled':''}>↑</button><button data-act="cgdown" data-g="${gi}" ${gi===G.length-1?'disabled':''}>↓</button><button data-act="cgdel" data-g="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-cgn="${gi}" value="${esc(n)}"></label><p class="hint">この区分の人物：${cnt}人。区分を削除すると、人物は「未分類」に移ります。</p></section>`};
+const grpSel=(c,i)=>RO?((S.cg&&S.cg.length)?roBox('区分',c.grp||'未分類'):''):(S.cg&&S.cg.length)?`<label class="f"><span>区分</span><select data-a="chars" data-i="${i}" data-k="grp"><option value="">未分類</option>${S.cg.map(n=>`<option value="${esc(n)}" ${c.grp===n?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:'';
+const cgDetail=()=>{const gi=cgSel();if(gi<0)return '';if(RO){const n=S.cg[gi];return `<section class="card"><div class="bar sb"><b>区分</b></div>${roBox('区分名',n)}<p class="hint">この区分の人物：${S.chars.filter(x=>(x.grp||'')===n).length}人</p></section>`}const G=S.cg,n=G[gi],cnt=S.chars.filter(x=>(x.grp||'')===n).length;return `<section class="card"><div class="bar sb"><b>区分</b><button data-act="cgup" data-g="${gi}" ${gi===0?'disabled':''}>↑</button><button data-act="cgdown" data-g="${gi}" ${gi===G.length-1?'disabled':''}>↓</button><button data-act="cgdel" data-g="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-cgn="${gi}" value="${esc(n)}"></label><p class="hint">この区分の人物：${cnt}人。区分を削除すると、人物は「未分類」に移ります。</p></section>`};
 const charList=()=>{const i=selChar(),G=S.cg||[],g=cgSel();
   const row=(x,k,sub)=>`<button class="li${sub?' sub':''}${k===i&&g<0?' on':''}" data-act="pick" data-t="chars" data-i="${k}">${esc(x.name)||'人物 '+(k+1)}${linked(x)?'<span class="badge">共有</span>':''}${cntBadge(x)}</button>`;
   const all=S.chars.map((x,k)=>({x,k}));
@@ -239,7 +243,7 @@ const charList=()=>{const i=selChar(),G=S.cg||[],g=cgSel();
   const un=all.filter(o=>!G.includes(o.x.grp||''));
   if(un.length)h+=`<div class="lh2">未分類（${un.length}）</div>`+un.map(o=>row(o.x,o.k,true)).join('');
   return h||'<p class="mut">まだ人物がいません</p>'};
-const charsHead=()=>`<p class="hint">人物ごとの設定を残します。左の一覧から選ぶと、右に詳細が表示されます。</p><div class="ms2"><div class="side"><div class="list">${charList()}</div><button class="add sm" data-act="add" data-k="chars">＋ 人物を追加</button>${shAddUI()}<div class="wbar"><input id="cgnew" placeholder="新しい区分名" aria-label="新しい区分名"><button class="sec" data-act="cgadd">＋ 区分を追加</button></div></div><div class="detail">${cgDetail()}`;
+const charsHead=()=>`<p class="hint">人物ごとの設定を残します。左の一覧から選ぶと、右に詳細が表示されます。</p><div class="ms2"><div class="side"><div class="list">${charList()}</div>${RO?'':`<button class="add sm" data-act="add" data-k="chars">＋ 人物を追加</button>${shAddUI()}<div class="wbar"><input id="cgnew" placeholder="新しい区分名" aria-label="新しい区分名"><button class="sec" data-act="cgadd">＋ 区分を追加</button></div>`}</div><div class="detail">${cgDetail()}`;
 const refSel=()=>{const G=[...S.refs.map((g,gi)=>({g,sc:'w',gi})),...(SRD?SRD.refs.map((g,gi)=>({g,sc:'s',gi})):[])];let cur=G.find(x=>x.sc===SEL.r.sc&&x.gi===SEL.r.gi);if(!cur&&G.length){cur=G[0];SEL.r={sc:cur.sc,gi:cur.gi,ii:-1}}const ii=cur&&SEL.r.ii>=0&&SEL.r.ii<(cur.g.items||[]).length?SEL.r.ii:-1;return {G,cur,ii}};
 const refSide=()=>{const {G,cur,ii}=refSel();return G.map(({g,sc,gi})=>{const on=cur&&cur.sc===sc&&cur.gi===gi;return `<button class="li lh${on&&ii===-1?' on':''}" data-act="pick" data-t="r" data-s="${sc}" data-g="${gi}">${esc(g.name)||'（区分名なし）'}${sc==='s'?'<span class="badge">共有</span>':''}</button>`+(g.items||[]).map((it,k)=>`<button class="li sub${on&&ii===k?' on':''}" data-act="pick" data-t="r" data-s="${sc}" data-g="${gi}" data-j="${k}">${esc(it.title)||'資料 '+(k+1)}</button>`).join('')}).join('')||'<p class="mut">まだ区分がありません</p>'};
 const refreshList=()=>{const sl=document.querySelector('.side .list');if(!sl)return;if(tab==='chars')sl.innerHTML=charList();else if(tab==='refs')sl.innerHTML=refSide()};
@@ -376,11 +380,12 @@ const emoGraph=()=>{const L=smallsInOrder(),LB=labels(),n=L.length;if(!n)return 
 const syncPanel=()=>{const c=ST.cfg||{};return `<section class="card"><div class="bar"><b>Googleドライブ同期</b></div><label class="f"><span>ウェブアプリのURL（末尾が /exec）</span><input id="su" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><label class="f"><span>合言葉（GASのスクリプトプロパティ TOKEN と同じもの）</span><input id="st" type="password" value="${esc(c.token)}" autocomplete="off"></label><p><button class="pri" data-act="scfg">保存して同期</button></p><p><button class="sec" data-act="spull">サーバーから読み込む</button> <button class="sec" data-act="spush">この端末で上書き</button></p><p class="hint" id="sync2">${esc(SS)}</p></section>`};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,9);
-const ta=(l,a,v,r,h)=>`<label class="f"><span>${l}</span><textarea rows="${r||3}" ${a} placeholder="${h||''}">${esc(v)}</textarea></label>`;
-const ip=(l,a,v,h)=>`<label class="f"><span>${l}</span><input ${a} value="${esc(v)}" placeholder="${h||''}"></label>`;
+const roBox=(l,v)=>`<div class="f"><span>${l}</span><div class="ro${v?'':' mut'}">${v?esc(v):'（未入力）'}</div></div>`;
+const ta=(l,a,v,r,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><textarea rows="${r||3}" ${a} placeholder="${h||''}">${esc(v)}</textarea></label>`;
+const ip=(l,a,v,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><input ${a} value="${esc(v)}" placeholder="${h||''}"></label>`;
 const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['write','執筆'],['fs','伏線'],['chars','人物'],['refs','資料'],['series','シリーズ'],['notes','メモ'],['io','保存']];
 
-function bar(kind,i,n,label){
+function bar(kind,i,n,label){if(RO)return `<div class="bar sb"><b>${label}</b></div>`;
   return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
 }
 const lvOf=s=>s.lv||3;
@@ -414,22 +419,22 @@ const sbar=(i,label)=>{const s=S.scenes[i],lv=lvOf(s);
   const lvSel=`<select data-a="scenes" data-i="${i}" data-k="lv" aria-label="箱の種類">${[[1,'大箱'],[2,'中箱'],[3,'小箱']].map(([v,t])=>`<option value="${v}" ${v===lv?'selected':''}>${t}</option>`).join('')}</select>`;
   const second=lv===1?`<select data-a="scenes" data-i="${i}" data-k="part" aria-label="構成上の位置">${METHODS[S.method||'kisho'].p.map((n,k)=>`<option value="${k}" ${bigPart(s)===k?'selected':''}>${n}</option>`).join('')}</select>`:`<select data-a="scenes" data-i="${i}" data-k="pid" aria-label="所属">${parOpts(s)}</select>`;
   return `<div class="bar sb"><b>${esc(label)}${lv<3&&s.title?'｜'+esc(s.title):''}</b>${lvSel}${second}<button data-act="up" data-k="scenes" data-i="${i}" ${sibIdx(i,-1)<0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="scenes" data-i="${i}" ${sibIdx(i,1)<0?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="scenes" data-i="${i}">削除</button></div>`};
-const extras=(c,i)=>(c.extra||[]).map((x,j)=>`<div class="xf"><div class="xh"><input data-x="${i}.${j}" data-xk="k" value="${esc(x.k)}" placeholder="項目名（例：口癖、年齢、好きなもの）" aria-label="項目名"><button data-act="xdel" data-i="${i}" data-j="${j}">削除</button></div><textarea rows="2" data-x="${i}.${j}" data-xk="v" aria-label="内容">${esc(x.v)}</textarea></div>`).join('');
+const extras=(c,i)=>RO?(c.extra||[]).filter(x=>x.k||x.v).map(x=>roBox(esc(x.k)||'（項目名なし）',x.v)).join(''):(c.extra||[]).map((x,j)=>`<div class="xf"><div class="xh"><input data-x="${i}.${j}" data-xk="k" value="${esc(x.k)}" placeholder="項目名（例：口癖、年齢、好きなもの）" aria-label="項目名"><button data-act="xdel" data-i="${i}" data-j="${j}">削除</button></div><textarea rows="2" data-x="${i}.${j}" data-xk="v" aria-label="内容">${esc(x.v)}</textarea></div>`).join('');
 const METHODS={kisho:{n:'起承転結',p:['起','承','転','結'],s:['状況設定','展開・障害','転換・山場','決着']},jo:{n:'序破急',p:['序','破','急'],s:['導入','展開','山場と結末']},san:{n:'三幕構成',p:['第1幕','第2幕','第3幕'],s:['設定','対立','解決']}};
 const CIRC='①②③④⑤⑥⑦⑧⑨⑩';
 const X={};
 const lastPart=()=>{const p=S.scenes.filter(x=>lvOf(x)===1).pop();return p?p.part||0:0};
-const msel=()=>`<label class="f ms"><span>構成法</span><select data-m="1">${Object.keys(METHODS).map(k=>`<option value="${k}" ${k===(S.method||'kisho')?'selected':''}>${METHODS[k].n}</option>`).join('')}</select></label>`;
+const msel=()=>RO?`<p class="hint">構成法：${METHODS[S.method||'kisho'].n}</p>`:`<label class="f ms"><span>構成法</span><select data-m="1">${Object.keys(METHODS).map(k=>`<option value="${k}" ${k===(S.method||'kisho')?'selected':''}>${METHODS[k].n}</option>`).join('')}</select></label>`;
 const changeMethod=nm=>{const o=METHODS[S.method||'kisho'].p.length,n=METHODS[nm].p.length;S.scenes.forEach(s=>{if(lvOf(s)===1)s.part=Math.round((s.part||0)/(o-1)*(n-1))});S.method=nm;save();render()};
 const tree=()=>{const D=treeD(),w=x=>({s:x,k:x.id}),mk=m=>({s:m.s,k:m.s.id,ch:m.small.map(w)});
   const T=D.nodes.map(n=>{const ch=n.mid.map(mk);if(n.direct.length)ch.push({s:null,k:'v'+n.s.id,ch:n.direct.map(w)});return {s:n.s,k:n.s.id,ch}});
   if(D.oMid.length||D.oSmall.length){const ch=D.oMid.map(mk);if(D.oSmall.length)ch.push({s:null,k:'vo',ch:D.oSmall.map(w)});T.push({s:null,k:'v0',ch})}
   return T};
-const CF=[['name','名前','i'],['role','立場・役割','i'],['alias','別名','i'],['sex','性別','i'],['height','身長','i'],['weight','体重','i'],['blood','血液型','i'],['age','年齢','i'],['bday','誕生日','i'],['numer','数秘'],['trait','性格'],['talent','個性・特技'],['skill','能力・スキル'],['look','見た目'],['past','生い立ち'],['want','欲望'],['secret','隠していること・背景'],['other','その他（自由記述）']];
+const CF=[['name','名前','i'],['role','立場・役割','i'],['alias','別名','i'],['sex','性別','i'],['height','身長','i'],['weight','体重','i'],['blood','血液型','i'],['age','年齢','i'],['bday','誕生日','i'],['numer','数秘'],['trait','性格'],['talent','個性・特技'],['skill','能力・スキル'],['look','見た目'],['past','生い立ち'],['want','欲望'],['secret','隠していること・背景'],['after','その後'],['actor','俳優'],['voice','声優'],['other','その他（自由記述）']];
 const arm=(b,orig,txt)=>{if(b.classList.contains('armed'))return true;b.classList.add('armed');b.textContent=txt||'もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent=orig},3000);return false};
 const tgt=t=>{const p=t.split('.');return p[0]==='chars'?S.chars[+p[1]]:(p[1]==='s'?SRD.refs:S.refs)[+p[2]].items[+p[3]]};
 const shrink=f=>new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{const r=Math.min(1,640/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.72))};im.src=fr.result};fr.readAsDataURL(f)});
-const imgs=(o,t)=>`<div class="imgs">${(o.imgs||[]).map((u,k)=>`<span class="im"><img src="${IMG[u]||BLANK}" data-iid="${u}" alt="イメージ画像"><button data-act="imdel" data-t="${t}" data-j="${k}" aria-label="画像を削除">×</button></span>`).join('')}<label class="addimg">＋ 画像<input type="file" accept="image/*" multiple data-t="${t}" aria-label="画像を追加"></label></div>`;
+const imgs=(o,t)=>(RO&&!(o.imgs||[]).length)?'':`<div class="imgs">${(o.imgs||[]).map((u,k)=>`<span class="im"><img src="${IMG[u]||BLANK}" data-iid="${u}" alt="イメージ画像">${RO?'':`<button data-act="imdel" data-t="${t}" data-j="${k}" aria-label="画像を削除">×</button>`}</span>`).join('')}${RO?'':`<label class="addimg">＋ 画像<input type="file" accept="image/*" multiple data-t="${t}" aria-label="画像を追加"></label>`}</div>`;
 const VIEWS={
   ov:()=>`<p class="hint">書き始める前に、作品の軸を短い言葉で決めておく欄です。</p>`+
     ta('ログライン（誰が・何を求め・何が立ちはだかるかを1文で）','data-p="ov.logline"',S.ov.logline,3)+
@@ -465,7 +470,7 @@ const VIEWS={
       <div class="g">${CF.filter(f=>f[2]==='i').map(f=>ip(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]])).join('')}</div>
       ${CF.filter(f=>f[2]!=='i').map(f=>ta(f[1]+(isSh(c,f[0])?'（共有）':''),a+' data-k="'+f[0]+'"',c[f[0]],f[0]==='other'?4:2)).join('')}
       
-      ${appearHtml(c)}${extras(c,i)}<button class="add sm" data-act="xadd" data-i="${i}">＋ 項目を追加</button>${shBtn(c,i)}</section>`}).join('')+
+      ${appearHtml(c)}${extras(c,i)}${RO?'':`<button class="add sm" data-act="xadd" data-i="${i}">＋ 項目を追加</button>${shBtn(c,i)}`}</section>`}).join('')+
     '</div></div>',
   sheet:()=>{const M=METHODS[S.method||'kisho'],T=tree(),O=S.ov,cols=[],bands=[];
     M.p.forEach((n,pi)=>{const g=T.filter(a=>Math.min(a.s?a.s.part||0:0,M.p.length-1)===pi);
@@ -496,11 +501,11 @@ const VIEWS={
       det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>${esc(LB[s.id])}</b><button data-act="gobox" data-id="${s.id}">箱書きで開く</button></div><label class="f"><span>状態</span><select data-st="${s.id}">${Object.entries(STN).map(([k,v])=>`<option value="${k}" ${(s.status||'')===k?'selected':''}>${v}</option>`).join('')}</select></label>${ctx.includes('<div>')?ctx:''}<label class="f"><span>本文（<b id="wcnt">${fmtN(cc(s))}</b>字）</span><textarea rows="20" data-tx="${s.id}" placeholder="ここに本文を書きます">${esc(s.text||'')}</textarea></label></section>`}
     return `<p class="hint">小箱ごとに本文を書きます。箱書きの順番に、原稿がつながります。</p>${top}<div class="ms2"><div class="side"><div class="list">${writeList()}</div></div><div class="detail">${det}</div></div>`},
   refs:()=>{const {cur,ii}=refSel();
-    let det='<div class="empty">左の「＋ 区分を追加」から作りましょう。</div>';
+    let det=RO?'<div class="empty">資料はまだありません。編集モードにすると、区分を追加できます。</div>':'<div class="empty">左の「＋ 区分を追加」から作りましょう。</div>';
     if(cur){const {g,sc,gi}=cur;
-      if(ii===-1)det=`<section class="card"><div class="bar sb"><b>区分</b>${sc==='s'?'<span class="badge">共有</span>':''}${sc==='w'&&!SRD?'':`<button data-act="gmove" data-s="${sc}" data-i="${gi}">${sc==='s'?'この作品だけにする':'シリーズで共有する'}</button>`}<button data-act="rdel" data-s="${sc}" data-i="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-gn="${sc}.${gi}" value="${esc(g.name)}" placeholder="例：舞台設定"></label><button class="add sm" data-act="radd" data-s="${sc}" data-i="${gi}">＋ 資料を追加</button></section>`;
-      else{const it=g.items[ii],r=`data-r="${sc}.${gi}.${ii}"`;det=`<section class="card"><div class="bar sb"><b>${esc(g.name)||'区分'}｜資料 ${ii+1}</b><button data-act="ridel" data-s="${sc}" data-i="${gi}" data-j="${ii}">削除</button></div>${ip('タイトル',r+' data-rk="title"',it.title)}${ta('内容・出典',r+' data-rk="body"',it.body,6)}${imgs(it,'refs.'+sc+'.'+gi+'.'+ii)}</section>`}}
-    return `<p class="hint">設定資料を区分ごとにためておく場所です。左の一覧から選ぶと、右に詳細が表示されます。${SRD?'「共有」の区分は、同じシリーズの全作品に表示されます。':''}</p><div class="ms2"><div class="side"><div class="list">${refSide()}</div><button class="add sm" data-act="gadd" data-s="w">＋ 区分を追加</button>${SRD?'<button class="add sm" data-act="gadd" data-s="s">＋ 共有の区分を追加</button>':''}</div><div class="detail">${det}</div></div>`},
+      if(ii===-1)det=RO?`<section class="card"><div class="bar sb"><b>区分</b>${sc==='s'?'<span class="badge">共有</span>':''}</div>${roBox('区分名',g.name)}<p class="hint">資料：${(g.items||[]).length}件</p></section>`:`<section class="card"><div class="bar sb"><b>区分</b>${sc==='s'?'<span class="badge">共有</span>':''}${sc==='w'&&!SRD?'':`<button data-act="gmove" data-s="${sc}" data-i="${gi}">${sc==='s'?'この作品だけにする':'シリーズで共有する'}</button>`}<button data-act="rdel" data-s="${sc}" data-i="${gi}">区分を削除</button></div><label class="f"><span>区分名</span><input data-gn="${sc}.${gi}" value="${esc(g.name)}" placeholder="例：舞台設定"></label><button class="add sm" data-act="radd" data-s="${sc}" data-i="${gi}">＋ 資料を追加</button></section>`;
+      else{const it=g.items[ii],r=`data-r="${sc}.${gi}.${ii}"`;det=`<section class="card"><div class="bar sb"><b>${esc(g.name)||'区分'}｜資料 ${ii+1}</b>${RO?'':`<button data-act="ridel" data-s="${sc}" data-i="${gi}" data-j="${ii}">削除</button>`}</div>${ip('タイトル',r+' data-rk="title"',it.title)}${ta('内容・出典',r+' data-rk="body"',it.body,6)}${imgs(it,'refs.'+sc+'.'+gi+'.'+ii)}</section>`}}
+    return `<p class="hint">設定資料を区分ごとにためておく場所です。左の一覧から選ぶと、右に詳細が表示されます。${SRD?'「共有」の区分は、同じシリーズの全作品に表示されます。':''}</p><div class="ms2"><div class="side"><div class="list">${refSide()}</div>${RO?'':`<button class="add sm" data-act="gadd" data-s="w">＋ 区分を追加</button>${SRD?'<button class="add sm" data-act="gadd" data-s="s">＋ 共有の区分を追加</button>':''}`}</div><div class="detail">${det}</div></div>`},
   series:()=>{const sid=curSid(),sr=WL.series.find(s=>s.id===sid);
     const opts='<option value="">なし</option>'+WL.series.map(s=>`<option value="${s.id}" ${s.id===sid?'selected':''}>${esc(s.name)||'（無題）'}</option>`).join('');
     const h=`<p class="hint">シリーズに入れると、人物と資料を作品どうしで共有できます。新しい作品は、いまの作品と同じシリーズに入ります。</p><label class="f"><span>この作品が属するシリーズ</span><select data-ws="1">${opts}</select></label><p><button class="sec" data-act="snew">＋ 新しいシリーズを作る</button></p>`;
@@ -515,7 +520,7 @@ const VIEWS={
 };
 function render(){
   document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" data-act="tab" data-k="${k}" aria-selected="${k===tab}">${l}</button>`).join('');
-  const sh=document.querySelector('.sheet'),sl=sh?sh.scrollLeft:0;document.getElementById('main').innerHTML=VIEWS[tab]();const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollLeft=sl;
+  const sh=document.querySelector('.sheet'),sl=sh?sh.scrollLeft:0;RO=(tab in EDIT)&&!EDIT[tab];const ls=document.querySelector('.side .list'),lt=(ls&&lastTab===tab)?ls.scrollTop:0;document.getElementById('main').innerHTML=(tab in EDIT?modeBar():'')+VIEWS[tab]();lastTab=tab;const ls2=document.querySelector('.side .list');if(ls2&&lt)ls2.scrollTop=lt;const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollLeft=sl;
   document.querySelector('.title').value=S.title||'';renderWbar();if(ST.nk)fetchVisible();
 }
 document.addEventListener('input',e=>{
@@ -542,7 +547,7 @@ document.addEventListener('input',e=>{
   else if(d.a){S[d.a][d.i][d.k]=(d.k==='lv'||d.k==='part')?+t.value:t.value;if(d.a==='chars'){syncShared(S.chars[+d.i],d.k,t.value);if(d.k==='name'||d.k==='grp')refreshList()}if(d.a==='scenes'&&d.k==='lv')relink(+d.i);if(d.k==='emv'){const y=window.scrollY;render();window.scrollTo(0,y)}else if(d.k==='lv'||d.k==='pid'||d.k==='part')render();}
   save();
 });
-document.addEventListener('click',async e=>{document.querySelectorAll('details.msel[open]').forEach(dt=>{if(!dt.contains(e.target))dt.open=false});
+document.addEventListener('click',async e=>{document.querySelectorAll('details.msel[open]').forEach(dt=>{if(!dt.contains(e.target))dt.open=false});const y0=window.scrollY;
   const im=e.target.closest('.im img');if(im){im.classList.toggle('big');return}
   const gp=e.target.closest('.gp');if(gp){tab='scenes';render();const el=document.getElementById('box-'+gp.dataset.id);if(el)el.scrollIntoView({block:'center'});return}
   const b=e.target.closest('button');if(!b||!b.dataset.act)return;
@@ -558,13 +563,14 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='rdel'){if(!arm(b,'区分を削除'))return;R(b.dataset.s).splice(i,1);touchR(b.dataset.s);SEL.r={sc:b.dataset.s,gi:Math.max(0,i-1),ii:-1};render();return}
   if(act==='ridel'){if(!arm(b,'削除'))return;R(b.dataset.s)[i].items.splice(+b.dataset.j,1);touchR(b.dataset.s);SEL.r.ii=-1;render();return}
   if(act==='gmove'){const sc=b.dataset.s;if(sc==='s'&&!arm(b,'この作品だけにする','他の作品からは見えなくなります。もう一度押す'))return;const [g]=R(sc).splice(i,1);const tg=sc==='s'?'w':'s';R(tg).push(g);SEL.r={sc:tg,gi:R(tg).length-1,ii:-1};save();saveSR();render();return}
-  if(act==='pick'){if(b.dataset.t==='chars'){SEL.chars=i;SEL.cg=-1}else if(b.dataset.t==='cg')SEL.cg=+b.dataset.g;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='pick'){if(b.dataset.t==='chars'){SEL.chars=i;SEL.cg=-1}else if(b.dataset.t==='cg')SEL.cg=+b.dataset.g;else SEL.r={sc:b.dataset.s,gi:+b.dataset.g,ii:b.dataset.j===undefined?-1:+b.dataset.j};render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,y0);return}
   if(act==='exdoc'||act==='exsheet'){const el=document.getElementById('exres')||{},chk=k=>{const e=document.querySelector('[data-exo="'+k+'"]');return !!(e&&e.checked)};if(!ST.cfg){el.textContent='Googleドライブ同期を設定してから使えます。';return}el.textContent='作成しています…（文章が長いと、1〜2分かかることがあります）';try{const r=act==='exdoc'?await call({op:'export',kind:'doc',title:wtitle()+'（原稿）'+dstr(),blocks:buildDoc(chk('h')),pdf:chk('pdf')}):await call({op:'export',kind:'sheet',title:wtitle()+'（箱書き・人物・伏線）'+dstr(),sheets:buildSheets()});if(r.ok)el.innerHTML=exLinks(r);else el.textContent='作成できませんでした：'+r.error+(/unknown/.test(r.error||'')?'（GASを最新の Code.gs に更新してください）':'')}catch(e){el.textContent='通信できませんでした'}return}
   if(act==='ugc'){if(!arm(b,'使われていない画像を整理する','どの作品でも使われていない画像を、端末とドライブから消します（ドライブはゴミ箱へ。24時間以内に追加した画像は対象外）。もう一度押す'))return;const el=document.getElementById('usage')||{};el.textContent='整理しています…';let nL=0,bL=0;try{const keep=await localRefs();for(const [k,s] of await kvScan()){if(k.startsWith('I:')&&!keep.has(k.slice(2))){await kvDel(k);nL++;bL+=s}}}catch(e){}let msg='端末内：使われていない画像 '+nL+'枚（'+fmt(bL)+'）を消しました。';if(ST.cfg){try{await flushDel();const r=await call({op:'gc'});msg+='\nドライブ：'+(r.ok?'使われていない画像 '+r.trashed+'枚（'+fmt(r.bytes)+'）をゴミ箱に移しました。':'整理できませんでした（'+r.error+'）。GASを最新の Code.gs に更新してください。')}catch(e){msg+='\nドライブ：通信できませんでした。'}}el.textContent=msg;return}
   if(act==='uscan'){const el=document.getElementById('usage')||{};el.textContent='調べています…';try{el.textContent=await usageText()}catch(e){el.textContent='調べられませんでした'}return}
   if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage')||{};const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
   if(act==='mkexp'){const m=document.getElementById('msg'),o=document.getElementById('out');m.textContent='作成中…';await ensureImgs();o.value=exportJson();m.textContent='作成しました（'+fmt(o.value.length)+'）';return}
-  if(act==='pickf'){SEL.f=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='mode'){EDIT[tab]=!EDIT[tab];const y=window.scrollY;render();window.scrollTo(0,y);return}
+  if(act==='pickf'){SEL.f=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,y0);return}
   if(act==='fsview'){tab='fs';SEL.f=b.dataset.id;render();return}
   if(act==='fsnew'){S.fs=S.fs||[];const id=uid();S.fs.push({id,title:'',note:'',plant:[],pay:[]});SEL.f=id;save();render();return}
   if(act==='fsdel'){if(!arm(b,'削除'))return;S.fs=(S.fs||[]).filter(f=>f.id!==b.dataset.id);save();render();return}
@@ -572,7 +578,7 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='fsunlink'){const f=(S.fs||[]).find(x=>x.id===b.dataset.fid),k=b.dataset.k;if(f){f[k]=(f[k]||[]).filter(x=>x!==b.dataset.sid);save();const y=window.scrollY;render();window.scrollTo(0,y)}return}
   if(act==='fsplant'||act==='fspay'){const s=S.scenes[i],el=document.getElementById('fs-sel-'+i),f=(S.fs||[]).find(x=>x.id===(el&&el.value)),k=act==='fsplant'?'plant':'pay';if(s&&f){f[k]=f[k]||[];if(!f[k].includes(s.id))f[k].push(s.id);save();const y=window.scrollY;render();window.scrollTo(0,y)}return}
   if(act==='fsnew1'){const s=S.scenes[i],el=document.getElementById('fs-new-'+i),n=el?el.value.trim():'';if(!s||!n)return;S.fs=S.fs||[];S.fs.push({id:uid(),title:n,note:'',plant:[s.id],pay:[]});save();const y=window.scrollY;render();window.scrollTo(0,y);return}
-  if(act==='pickw'){SEL.w=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(act==='pickw'){SEL.w=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,y0);return}
   if(act==='gobox'){tab='scenes';render();const el=document.getElementById('box-'+b.dataset.id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='addbig'){const id=uid();S.scenes.push({id,lv:1,part:+b.dataset.part,title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
   if(act==='addchild'){const id=uid();S.scenes.push({id,lv:+b.dataset.lv,pid:b.dataset.pid,title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''});save();render();const el=document.getElementById('box-'+id);if(el)el.scrollIntoView({block:'center'});return}
