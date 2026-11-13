@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#2F5D8A">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@300;400;500&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F2F4F6;--surface:#fff;--ink:#1E2A38;--sub:#5B6877;--line:#D5DBE2;--accent:#2F5D8A;--on:#fff;--soft:#E3ECF5;--up:#3C8D6E;--down:#B4523E;--mid:#8A94A0;--c1:#2F5D8A;--c2:#C2417F;--c3:#B06A10;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -15,18 +15,18 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 :root[data-theme="dark"]{--bg:#141A21;--surface:#1D252E;--ink:#E6EBF0;--sub:#9AA7B5;--line:#34414F;--accent:#7FB0E0;--on:#10202F;--soft:#23384D;--up:#5CC29B;--down:#E58A74;--c1:#7FB0E0;--c2:#F08CB8;--c3:#E8A94B}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.8 "Zen Maru Gothic","メイリオ",Meiryo,"Hiragino Sans","Yu Gothic",sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.85 "Kiwi Maru","Zen Maru Gothic","メイリオ",Meiryo,"Hiragino Sans","Yu Gothic",sans-serif;letter-spacing:0.04em}
 .wrap{max-width:none;margin:0;padding:20px max(clamp(12px,2.5vw,32px),env(safe-area-inset-right,0px)) 80px max(clamp(12px,2.5vw,32px),env(safe-area-inset-left,0px))}
-.title{width:100%;border:0;background:transparent;color:var(--ink);font-family:inherit;font-weight:700;font-size:26px;line-height:1.4;padding:6px 0;border-bottom:2px solid var(--line)}
+.title{width:100%;border:0;background:transparent;color:var(--ink);font-family:inherit;font-weight:500;font-size:26px;line-height:1.4;padding:6px 0;letter-spacing:0.04em;border-bottom:2px solid var(--line)}
 .title:focus{outline:none;border-color:var(--accent)}
 nav{display:flex;gap:4px;overflow-x:auto;margin:14px 0 20px;padding-bottom:2px}
-nav button{flex:none;border:0;background:transparent;color:var(--sub);font-family:inherit;font-weight:500;font-size:15px;padding:8px 14px;border-radius:8px;cursor:pointer}
+nav button{flex:none;border:0;background:transparent;color:var(--sub);font-family:inherit;font-weight:500;font-size:15px;padding:8px 14px;border-radius:8px;cursor:pointer;letter-spacing:0.03em}
 nav button[aria-selected="true"]{background:var(--accent);color:var(--on)}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .f{display:block;margin:0 0 16px}
 .f>span{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
-input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
-textarea{resize:vertical;line-height:1.7}
+input,textarea,select{width:100%;font:inherit;letter-spacing:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+textarea{resize:vertical;line-height:1.8}
 .card{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--mid);border-radius:10px;padding:14px 14px 4px;margin:0 0 14px}
 .card.up{box-shadow:inset -6px 0 0 var(--up)}.card.down{box-shadow:inset -6px 0 0 var(--down)}
 .card.lv1{background:var(--soft);border-left-color:var(--c1)}.card.lv2{margin-left:14px;border-left-color:var(--c2)}.card.lv3{margin-left:28px;border-left-color:var(--c3)}
