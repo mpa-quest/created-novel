@@ -112,6 +112,16 @@ div.bx{cursor:default}
 .usage{white-space:pre-wrap;font-size:14px;line-height:1.8;margin-top:8px}
 .gwrap{overflow-x:auto}.gp{cursor:pointer}
 .ev{display:block;font-size:12px;margin-top:2px;color:var(--sub)}.ev.up{color:var(--up)}.ev.down{color:var(--down)}
+/* ---- メモタブ：タグの絞り込みと、一覧の見た目 ---- */
+.mtags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.mhd{font-size:13px;color:var(--sub);width:100%}
+.mchip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:2px 10px;font-size:13px;font-family:inherit;cursor:pointer}
+.mchip.on{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.mtag{display:inline-flex;align-items:center;border:1px solid var(--c1);color:var(--c1);border-radius:999px;margin:0 6px 6px 0;padding-left:10px;font-size:14px}
+.mtag button{border:0;background:transparent;color:inherit;cursor:pointer;padding:2px 8px;font-size:14px}
+.li.memo{flex-direction:column;align-items:flex-start;gap:2px}
+.li.memo .mt-title{font-weight:700;overflow-wrap:anywhere}
+.li.memo .mt-tags,.li.memo .mt-date{font-size:12px;opacity:.8}
 .modebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.modebar .hint{margin:0}
 .ro{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:2.2em}.ro.mut{color:var(--sub);opacity:.8}
 .chk1{display:flex;align-items:center;gap:8px;font-size:15px}.chk1 input{width:auto}
@@ -162,10 +172,10 @@ details.aimsd{margin-bottom:12px}details.aimsd>summary{cursor:pointer;color:var(
 </div>
 <script>
 const KEY='sousaku-note-v1';
-const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],fs:[],goal:{pages:'',deadline:''},notes:''});
+const blank=()=>({title:'',ov:{logline:'',theme:'',anti:'',tcj:'',want:'',thru:'',goal:'',conflict:'',ending:''},plot:{ki:'',sho:'',ten:'',ketsu:''},pl:{},method:'kisho',scenes:[],chars:[],cg:[],refs:[],fs:[],memos:[],goal:{pages:'',deadline:''},notes:''});
 let S=blank(),tab='ov';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(blank(),JSON.parse(r))}catch(e){}
-const migrate=()=>{S.pl=S.pl||{};(S.scenes||[]).forEach(s=>{if(s.emo!==undefined){if(s.emv===undefined){const m={'＋':5,'－':-5,'±':0};if(m[s.emo]!==undefined)s.emv=m[s.emo]}delete s.emo}});const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
+const migrate=()=>{S.pl=S.pl||{};memoMigrate();(S.scenes||[]).forEach(s=>{if(s.emo!==undefined){if(s.emv===undefined){const m={'＋':5,'－':-5,'±':0};if(m[s.emo]!==undefined)s.emv=m[s.emo]}delete s.emo}});const L0=S.scenes||[];if(L0.some(s=>(s.lv||3)>1&&s.pid===undefined)){let bg='',md='';L0.forEach(s=>{const l=s.lv||3;if(l===1){bg=s.id;md=''}else if(l===2){s.pid=bg;md=s.id}else s.pid=md||bg})}const p=S.plot;if(p&&!S.pl.kisho&&(p.ki||p.sho||p.ten||p.ketsu))S.pl.kisho=[p.ki||'',p.sho||'',p.ten||'',p.ketsu||''];S.chars.forEach(c=>{if(c.flaw){(c.extra=c.extra||[]).push({k:'弱さ・欠点',v:c.flaw})}delete c.flaw})};migrate();
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('sousaku',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})};
 const kvSet=async(k,v)=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
@@ -377,13 +387,573 @@ const emoGraph=()=>{const L=smallsInOrder(),LB=labels(),n=L.length;if(!n)return 
   pts.forEach(p=>{const c=p[3]>0?'var(--up)':p[3]<0?'var(--down)':'var(--mid)';svg+=`<g class="gp" data-id="${p[2].id}"><circle cx="${p[0]}" cy="${p[1]}" r="6" style="fill:${c};stroke:var(--surface)" stroke-width="2"><title>${esc(LB[p[2].id])}｜${esc(sn(p[2])||p[2].place||'')}：${evLab(p[3])}</title></circle></g>`});
   svg+='</svg>';
   return `<section class="card"><div class="bar"><b>感情の起伏</b></div><div class="gwrap">${svg}</div><p class="hint">点は小箱です（押すと、その小箱の箱書きに移ります）。横軸は物語の順番で、左端（縦軸の上）が起の最初です。下の名前は大箱です。縦軸は感情の動きで、＋10が最高潮、−10がどん底です。未設定の小箱には、点がありません。</p></section>`};
+/* ===== メモ機能（ここから） ===== */
+/*
+ * 【このブロックについて】
+ * 「メモ」タブの機能（複数のメモ、タグ付け、タグでの絞り込み）をまとめた部分です。
+ * 書き方のルール：
+ *   - 文字列は、基本的にダブルクォーテーションで囲む
+ *   - 関数と関数のあいだは、2行あける
+ *   - 関数には、説明のコメント（ドキュメンテーション）をつける
+ * 関数は「function 名前() { ... }」の形で書いているので、
+ * ファイルのどこからでも呼び出せます。
+ */
+
+
+/**
+ * メモタブだけで使う、画面の一時的な状態です（保存はされません）。
+ * - selectedId : いま右側に表示しているメモのID
+ * - filterTags : 絞り込みに使っているタグの配列
+ */
+const MEMO_UI = {
+  selectedId: "",
+  filterTags: []
+};
+
+
+/**
+ * メモのデータ（配列）を返します。
+ * まだ無い場合は、空の配列を作ってから返します。
+ * @returns {Array} メモの配列。1件は { id, title, body, tags, created, updated } です
+ */
+function memoList() {
+  if (!Array.isArray(S.memos)) {
+    S.memos = [];
+  }
+  return S.memos;
+}
+
+
+/**
+ * メモにつける、重複しないIDを作ります。
+ * ランダムな文字列と、いまの時刻を組み合わせています。
+ * @returns {string} 新しいID
+ */
+function memoNewId() {
+  return "m" + Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
+}
+
+
+/**
+ * 古い形式のデータを、新しい形式に変換します。
+ * 以前の「メモ」は1つの長い文章（S.notes）でした。
+ * それを、メモの1件目として引き継ぎます。
+ * ※アプリを開いた直後と、データを読み込んだ直後に呼ばれます。
+ */
+function memoMigrate() {
+  // メモの配列がなければ、空の配列を用意します
+  if (!Array.isArray(S.memos)) {
+    S.memos = [];
+  }
+
+  // 古い文章が残っているときだけ、メモの1件目に変換します
+  if (typeof S.notes === "string" && S.notes.trim() !== "") {
+    const now = Date.now();
+    // IDを固定にしているのは、別の端末で変換しても、同じメモとして扱うためです
+    S.memos.unshift({
+      id: "mlegacy",
+      title: "メモ",
+      body: S.notes,
+      tags: [],
+      created: now,
+      updated: now
+    });
+    // 二重に変換されないよう、古い文章は空にします
+    S.notes = "";
+  }
+}
+
+
+/**
+ * メモを1件追加します。いま絞り込み中のタグがあれば、そのタグを最初からつけます。
+ * 追加したメモは、一番上に並び、右側に表示されます。
+ */
+function memoAddMemo() {
+  const now = Date.now();
+  const memo = {
+    id: memoNewId(),
+    title: "",
+    body: "",
+    tags: MEMO_UI.filterTags.slice(),
+    created: now,
+    updated: now
+  };
+  memoList().unshift(memo);
+  MEMO_UI.selectedId = memo.id;
+  save();
+  render();
+  // すぐ書き始められるよう、タイトル欄にカーソルを置きます
+  const titleInput = document.querySelector("[data-mt]");
+  if (titleInput) {
+    titleInput.focus();
+  }
+}
+
+
+/**
+ * IDからメモを探して返します。
+ * @param {string} id メモのID
+ * @returns {Object|null} 見つかったメモ。なければ null
+ */
+function memoFind(id) {
+  return memoList().find(function (memo) {
+    return memo.id === id;
+  }) || null;
+}
+
+
+/**
+ * メモの更新日時を、いまの時刻にします。
+ * @param {Object} memo 更新したメモ
+ */
+function memoTouch(memo) {
+  memo.updated = Date.now();
+}
+
+
+/**
+ * 入力されたタグの文字を、使える形に整えます。
+ * - 前後の空白を取り除く
+ * - 先頭の「#」や「＃」を取り除く
+ * - 20文字までに切り詰める
+ * @param {string} text 入力された文字
+ * @returns {string} 整えたタグ（空のときは空の文字）
+ */
+function memoNormTag(text) {
+  let tag = String(text || "").trim();
+  tag = tag.replace(/^[#＃]+/, "").trim();
+  return tag.slice(0, 20);
+}
+
+
+/**
+ * すべてのメモで使われているタグを、使われている件数といっしょに集めます。
+ * @returns {Array} { tag, count } の配列。件数が多い順（同じなら五十音順）
+ */
+function memoAllTags() {
+  const counts = {};
+
+  memoList().forEach(function (memo) {
+    (memo.tags || []).forEach(function (tag) {
+      counts[tag] = (counts[tag] || 0) + 1;
+    });
+  });
+
+  return Object.keys(counts)
+    .map(function (tag) {
+      return { tag: tag, count: counts[tag] };
+    })
+    .sort(function (a, b) {
+      return b.count - a.count || a.tag.localeCompare(b.tag, "ja");
+    });
+}
+
+
+/**
+ * 絞り込みの条件に合うメモだけを返します。
+ * 選んだタグを「すべて」持っているメモだけが対象です（AND条件）。
+ * 何もタグを選んでいなければ、すべてのメモを返します。
+ * @returns {Array} 条件に合うメモの配列
+ */
+function memoVisible() {
+  const selected = MEMO_UI.filterTags;
+  return memoList().filter(function (memo) {
+    return selected.every(function (tag) {
+      return (memo.tags || []).includes(tag);
+    });
+  });
+}
+
+
+/**
+ * いま右側に表示するメモを決めて返します。
+ * 選んでいるメモが、絞り込みで見えなくなっていたら、一番上のメモにします。
+ * @returns {Object|null} 表示するメモ。1件もなければ null
+ */
+function memoCurrent() {
+  const visible = memoVisible();
+  const found = visible.find(function (memo) {
+    return memo.id === MEMO_UI.selectedId;
+  });
+  const current = found || visible[0] || null;
+  MEMO_UI.selectedId = current ? current.id : "";
+  return current;
+}
+
+
+/**
+ * 一覧に出す、メモの見出しを返します。
+ * タイトルがあればタイトル、なければ本文の1行目、どちらもなければ「（無題）」です。
+ * @param {Object} memo メモ
+ * @returns {string} 見出しの文字
+ */
+function memoTitleOf(memo) {
+  const title = String(memo.title || "").trim();
+  if (title) {
+    return title;
+  }
+  const firstLine = String(memo.body || "").split("\n")[0].trim();
+  return firstLine ? firstLine.slice(0, 24) : "（無題）";
+}
+
+
+/**
+ * 時刻（ミリ秒）を、「2026-11-14 09:30」のような文字にします。
+ * @param {number} time 時刻
+ * @returns {string} 読みやすい日時の文字
+ */
+function memoDateText(time) {
+  const date = new Date(time || Date.now());
+  const two = function (n) {
+    return String(n).padStart(2, "0");
+  };
+  return date.getFullYear() + "-" + two(date.getMonth() + 1) + "-" + two(date.getDate())
+    + " " + two(date.getHours()) + ":" + two(date.getMinutes());
+}
+
+
+/**
+ * 左側の「メモの一覧」のHTMLを作ります。
+ * 絞り込みに合うメモだけを、新しく更新した順ではなく、並んでいる順に出します。
+ * @returns {string} HTMLの文字
+ */
+function memoListHtml() {
+  const current = memoCurrent();
+  const visible = memoVisible();
+
+  if (visible.length === 0) {
+    return "<p class=\"mut\">" + (memoList().length === 0 ? "まだメモがありません" : "条件に合うメモがありません") + "</p>";
+  }
+
+  return visible.map(function (memo) {
+    const isOn = current && memo.id === current.id ? " on" : "";
+    const tags = (memo.tags || []).map(function (tag) {
+      return "#" + esc(tag);
+    }).join(" ");
+    return "<button class=\"li memo" + isOn + "\" data-act=\"memoPick\" data-id=\"" + memo.id + "\">"
+      + "<span class=\"mt-title\">" + esc(memoTitleOf(memo)) + "</span>"
+      + (tags ? "<span class=\"mt-tags\">" + tags + "</span>" : "")
+      + "<span class=\"mt-date\">" + memoDateText(memo.updated) + "</span>"
+      + "</button>";
+  }).join("");
+}
+
+
+/**
+ * 左側の「タグで絞り込む」部分のHTMLを作ります。
+ * 「すべて」と、使われているタグのボタンが並びます。選んでいるタグは色が変わります。
+ * @returns {string} HTMLの文字
+ */
+function memoTagBarHtml() {
+  const tags = memoAllTags();
+  if (tags.length === 0) {
+    return "<p class=\"hint\">タグはまだありません。メモにタグをつけると、ここから絞り込めます。</p>";
+  }
+
+  const noFilter = MEMO_UI.filterTags.length === 0;
+  const chips = tags.map(function (item) {
+    const isOn = MEMO_UI.filterTags.includes(item.tag) ? " on" : "";
+    return "<button class=\"mchip" + isOn + "\" data-act=\"memoFilter\" data-tag=\"" + esc(item.tag) + "\">#"
+      + esc(item.tag) + "（" + item.count + "）</button>";
+  }).join("");
+
+  return "<div class=\"mtags\"><span class=\"mhd\">タグで絞り込み</span>"
+    + "<button class=\"mchip" + (noFilter ? " on" : "") + "\" data-act=\"memoFilter\" data-tag=\"\">すべて</button>"
+    + chips + "</div>";
+}
+
+
+/**
+ * 右側の「選んだメモの詳細」のHTMLを作ります。
+ * タイトル、タグ（追加と削除）、本文を編集できます。
+ * @param {Object|null} memo 表示するメモ
+ * @returns {string} HTMLの文字
+ */
+function memoDetailHtml(memo) {
+  if (!memo) {
+    return "<div class=\"empty\">左の「＋ メモを追加」から、メモを作りましょう。</div>";
+  }
+
+  // このメモについているタグを、削除ボタンつきで並べます
+  const chips = (memo.tags || []).map(function (tag) {
+    return "<span class=\"mtag\">#" + esc(tag)
+      + "<button data-act=\"memoTagDel\" data-id=\"" + memo.id + "\" data-tag=\"" + esc(tag) + "\" aria-label=\"タグを外す\">×</button></span>";
+  }).join("");
+
+  // 入力の候補として、すでに使っているタグを出します
+  const options = memoAllTags().map(function (item) {
+    return "<option value=\"" + esc(item.tag) + "\"></option>";
+  }).join("");
+
+  return "<section class=\"card\">"
+    + "<div class=\"bar sb\"><b>メモ</b><button data-act=\"memoDelete\" data-id=\"" + memo.id + "\">削除</button></div>"
+    + "<label class=\"f\"><span>タイトル</span><input data-mt=\"" + memo.id + "\" value=\"" + esc(memo.title) + "\" placeholder=\"タイトル\"></label>"
+    + "<div class=\"f\"><span>タグ</span>"
+    + "<div class=\"fsl\">" + (chips || "<span class=\"mut\">なし</span>") + "</div>"
+    + "<div class=\"fsadd\"><input id=\"memo-tag-input\" list=\"memo-tag-options\" placeholder=\"タグを入力して、Enterか「追加」\">"
+    + "<button class=\"sec\" data-act=\"memoTagAdd\" data-id=\"" + memo.id + "\">追加</button></div>"
+    + "<datalist id=\"memo-tag-options\">" + options + "</datalist></div>"
+    + "<label class=\"f\"><span>本文（<b id=\"memo-count\">" + Array.from(memo.body || "").length + "</b>字）</span>"
+    + "<textarea rows=\"18\" data-mb=\"" + memo.id + "\">" + esc(memo.body) + "</textarea></label>"
+    + "<p class=\"hint\">作成：" + memoDateText(memo.created) + "　更新：" + memoDateText(memo.updated) + "</p>"
+    + "</section>";
+}
+
+
+/**
+ * 「メモ」タブ全体のHTMLを作ります。
+ * 左に「追加ボタン・タグでの絞り込み・メモの一覧」、右に「選んだメモの詳細」が並びます。
+ * 人物タブと同じ、「一覧と詳細」の形です。
+ * @returns {string} HTMLの文字
+ */
+function memoView() {
+  const total = memoList().length;
+  const visible = memoVisible().length;
+  const countText = MEMO_UI.filterTags.length > 0
+    ? "該当：" + visible + "件（全" + total + "件）"
+    : "全" + total + "件";
+
+  return "<p class=\"hint\">世界観、取材メモ、思いついたことなどを、自由に書きとめます。タグをつけると、あとから絞り込めます。</p>"
+    + "<div class=\"ms2\"><div class=\"side\">"
+    + "<button class=\"add sm\" data-act=\"memoAdd\">＋ メモを追加</button>"
+    + memoTagBarHtml()
+    + "<p class=\"hint\" id=\"memo-count-text\">" + countText + "</p>"
+    + "<div class=\"list\">" + memoListHtml() + "</div>"
+    + "</div><div class=\"detail\">" + memoDetailHtml(memoCurrent()) + "</div></div>";
+}
+
+
+/**
+ * 左側のメモの一覧だけを、作り直します。
+ * タイトルを入力している途中に、一覧の表示をすぐ変えるために使います
+ * （画面全体を作り直すと、入力中のカーソルが外れてしまうためです）。
+ */
+function memoRefreshList() {
+  if (tab !== "memo") {
+    return;
+  }
+  const list = document.querySelector(".side .list");
+  if (list) {
+    list.innerHTML = memoListHtml();
+  }
+  const countText = document.getElementById("memo-count-text");
+  if (countText) {
+    const total = memoList().length;
+    countText.textContent = MEMO_UI.filterTags.length > 0
+      ? "該当：" + memoVisible().length + "件（全" + total + "件）"
+      : "全" + total + "件";
+  }
+}
+
+
+/**
+ * 画面を作り直して、スクロールの位置は、そのままにします。
+ * タグの追加などの後に、画面が上に戻らないようにするための関数です。
+ */
+function memoRenderKeepScroll() {
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+}
+
+
+/**
+ * メモにタグを1つ追加します。
+ * 空の文字や、すでについているタグは、追加しません。
+ * @param {Object} memo タグを追加するメモ
+ * @param {string} text 入力されたタグの文字
+ */
+function memoAddTag(memo, text) {
+  const tag = memoNormTag(text);
+  if (!tag) {
+    return;
+  }
+  memo.tags = memo.tags || [];
+  if (!memo.tags.includes(tag)) {
+    memo.tags.push(tag);
+    memoTouch(memo);
+    save();
+  }
+  memoRenderKeepScroll();
+  // 続けて入力できるよう、タグの入力欄にカーソルを戻します
+  const input = document.getElementById("memo-tag-input");
+  if (input) {
+    input.focus();
+  }
+}
+
+
+/**
+ * 入力欄に文字が入力されたときの処理です（メモタブの入力欄だけが対象）。
+ * タイトルと本文は、入力するたびに、データへ書き込んで保存します。
+ * @param {Object} data 入力欄の data-* 属性（element.dataset）
+ * @param {HTMLElement} target 入力された要素
+ * @returns {boolean} この関数で処理したら true。メモタブと関係なければ false
+ */
+function memoHandleInput(data, target) {
+  // タグの入力欄は、「追加」を押すまでは何もしません
+  if (target.id === "memo-tag-input") {
+    return true;
+  }
+
+  // タイトルの入力
+  if (data.mt !== undefined) {
+    const memo = memoFind(data.mt);
+    if (memo) {
+      memo.title = target.value;
+      memoTouch(memo);
+      save();
+      memoRefreshList();
+    }
+    return true;
+  }
+
+  // 本文の入力
+  if (data.mb !== undefined) {
+    const memo = memoFind(data.mb);
+    if (memo) {
+      memo.body = target.value;
+      memoTouch(memo);
+      save();
+      memoRefreshList();
+      const counter = document.getElementById("memo-count");
+      if (counter) {
+        counter.textContent = Array.from(memo.body).length;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
+ * ボタンが押されたときの処理です（メモタブのボタンだけが対象）。
+ * @param {string} act ボタンの data-act の値（どの操作かを表す名前）
+ * @param {HTMLElement} button 押されたボタン
+ * @returns {boolean} この関数で処理したら true。メモタブと関係なければ false
+ */
+function memoHandleClick(act, button) {
+  const id = button.dataset.id || "";
+
+  // メモを追加する
+  if (act === "memoAdd") {
+    memoAddMemo();
+    return true;
+  }
+
+  // 一覧のメモを選ぶ
+  if (act === "memoPick") {
+    MEMO_UI.selectedId = id;
+    const y = window.scrollY;
+    render();
+    const detail = document.querySelector(".detail");
+    // 画面が狭いときは、詳細が見える位置まで動かします
+    if (detail && window.innerWidth < 640) {
+      detail.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo(0, y);
+    }
+    return true;
+  }
+
+  // タグで絞り込む（もう一度押すと解除。「すべて」はすべて解除）
+  if (act === "memoFilter") {
+    const tag = button.dataset.tag || "";
+    if (tag === "") {
+      MEMO_UI.filterTags = [];
+    } else if (MEMO_UI.filterTags.includes(tag)) {
+      MEMO_UI.filterTags = MEMO_UI.filterTags.filter(function (item) {
+        return item !== tag;
+      });
+    } else {
+      MEMO_UI.filterTags.push(tag);
+    }
+    memoRenderKeepScroll();
+    return true;
+  }
+
+  // タグを追加する（「追加」ボタン）
+  if (act === "memoTagAdd") {
+    const memo = memoFind(id);
+    const input = document.getElementById("memo-tag-input");
+    if (memo && input) {
+      memoAddTag(memo, input.value);
+    }
+    return true;
+  }
+
+  // タグを外す（タグの横の「×」）
+  if (act === "memoTagDel") {
+    const memo = memoFind(id);
+    if (memo) {
+      const tag = button.dataset.tag || "";
+      memo.tags = (memo.tags || []).filter(function (item) {
+        return item !== tag;
+      });
+      // 絞り込みに使っていたタグが、どのメモにも無くなったら、その絞り込みは外します
+      MEMO_UI.filterTags = MEMO_UI.filterTags.filter(function (item) {
+        return memoAllTags().some(function (info) {
+          return info.tag === item;
+        });
+      });
+      memoTouch(memo);
+      save();
+      memoRenderKeepScroll();
+    }
+    return true;
+  }
+
+  // メモを削除する（2回押して確認）
+  if (act === "memoDelete") {
+    if (!arm(button, "削除")) {
+      return true;
+    }
+    S.memos = memoList().filter(function (memo) {
+      return memo.id !== id;
+    });
+    MEMO_UI.selectedId = "";
+    save();
+    memoRenderKeepScroll();
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
+ * キーが押されたときの処理です。
+ * タグの入力欄で Enter キーを押したら、タグを追加します。
+ * 日本語の変換中（文字を確定する Enter）は、追加しないようにしています。
+ * @param {KeyboardEvent} event キーボードのイベント
+ */
+function memoOnKeydown(event) {
+  if (event.key !== "Enter" || event.isComposing) {
+    return;
+  }
+  if (!event.target || event.target.id !== "memo-tag-input") {
+    return;
+  }
+  event.preventDefault();
+  const memo = memoCurrent();
+  if (memo) {
+    memoAddTag(memo, event.target.value);
+  }
+}
+
+
+// キーボードの操作を受け取る準備です（アプリを開いたときに、1回だけ行います）
+document.addEventListener("keydown", memoOnKeydown);
+/* ===== メモ機能（ここまで） ===== */
 const syncPanel=()=>{const c=ST.cfg||{};return `<section class="card"><div class="bar"><b>Googleドライブ同期</b></div><label class="f"><span>ウェブアプリのURL（末尾が /exec）</span><input id="su" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><label class="f"><span>合言葉（GASのスクリプトプロパティ TOKEN と同じもの）</span><input id="st" type="password" value="${esc(c.token)}" autocomplete="off"></label><p><button class="pri" data-act="scfg">保存して同期</button></p><p><button class="sec" data-act="spull">サーバーから読み込む</button> <button class="sec" data-act="spush">この端末で上書き</button></p><p class="hint" id="sync2">${esc(SS)}</p></section>`};
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,9);
 const roBox=(l,v)=>`<div class="f"><span>${l}</span><div class="ro${v?'':' mut'}">${v?esc(v):'（未入力）'}</div></div>`;
 const ta=(l,a,v,r,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><textarea rows="${r||3}" ${a} placeholder="${h||''}">${esc(v)}</textarea></label>`;
 const ip=(l,a,v,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><input ${a} value="${esc(v)}" placeholder="${h||''}"></label>`;
-const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['write','執筆'],['fs','伏線'],['chars','人物'],['refs','資料'],['series','シリーズ'],['notes','メモ'],['io','保存']];
+const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['write','執筆'],['fs','伏線'],['chars','人物'],['refs','資料'],['series','シリーズ'],['memo','メモ'],['io','保存']];
 
 function bar(kind,i,n,label){if(RO)return `<div class="bar sb"><b>${label}</b></div>`;
   return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
@@ -511,7 +1081,7 @@ const VIEWS={
     const h=`<p class="hint">シリーズに入れると、人物と資料を作品どうしで共有できます。新しい作品は、いまの作品と同じシリーズに入ります。</p><label class="f"><span>この作品が属するシリーズ</span><select data-ws="1">${opts}</select></label><p><button class="sec" data-act="snew">＋ 新しいシリーズを作る</button></p>`;
     if(!sr||!SRD)return h;
     return h+`<section class="card"><div class="bar"><b>シリーズの設定</b></div>${ip('シリーズ名','data-sn="1"',sr.name)}<p class="hint">作品ごとに変わらない人物の項目にチェックを入れます。チェックした項目は、シリーズ内の同じ人物で同じ値になります。チェックを入れた時は、いま開いている作品の値がシリーズ全体に反映され、他の作品は開いた時に置き換わります。チェックを外すと、各作品が持っている値がそのまま残ります。</p><div class="g chk">${CF.filter(f=>f[0]!=='name').map(f=>`<label><input type="checkbox" data-sf="${f[0]}" ${SRD.sharedFields.includes(f[0])?'checked':''}> ${f[1]}</label>`).join('')}</div></section><section class="card"><div class="bar"><b>共有している人物（${SRD.chars.length}）</b></div>${SRD.chars.map((c,i)=>`<div class="xh"><input data-sl="${i}" value="${esc(c.label)}" aria-label="識別用の呼び名"><button data-act="scdel" data-i="${i}">削除</button></div>`).join('')||'<p class="hint">まだありません。人物タブで「シリーズで共有する」を押すと、ここに並びます。</p>'}</section><p><button class="sec" data-act="sdel">このシリーズを削除</button></p>`},
-  notes:()=>`<p class="hint">世界観、取材メモ、講師・仲間からの講評など、自由に書けます。</p>`+ta('','data-p="notes"',S.notes,18),
+  memo:()=>memoView(),
   io:()=>syncPanel()+devicePanel()+exportPanel()+`<p class="hint">データはこの端末に保存され、同期を設定するとGoogleドライブにも保存されます。下の書き出しは、控えを取るときに使います。</p>
     <label class="f"><span>書き出し（いま開いている作品）</span><textarea id="out" rows="6" readonly placeholder="「書き出しを作る」を押すと、ここに表示されます"></textarea></label>
     <p><button class="sec" data-act="mkexp">書き出しを作る</button> <button class="pri" data-act="copy">コピー</button> <span id="msg" class="hint"></span></p>
@@ -529,6 +1099,7 @@ document.addEventListener('input',e=>{
   if(d.cf!==undefined){const q=t.value.trim();t.closest('.menu').querySelectorAll('.mi').forEach(el=>{el.hidden=!!q&&!el.textContent.includes(q)});return}
   if(d.ft!==undefined){const f=(S.fs||[]).find(x=>x.id===d.ft);if(f){f.title=t.value;save();const sl=document.querySelector('.side .list');if(sl&&tab==='fs')sl.innerHTML=fsList()}return}
   if(d.fn!==undefined){const f=(S.fs||[]).find(x=>x.id===d.fn);if(f){f.note=t.value;save()}return}
+  if(memoHandleInput(d,t))return;
   if(d.aim!==undefined){const [si,cid]=d.aim.split('.'),sc=S.scenes[+si];if(sc){(sc.aims=sc.aims||{})[cid]=t.value;save()}return}
   if(d.tx!==undefined){const sc=S.scenes.find(x=>x.id===d.tx);if(sc){sc.text=t.value;save();refreshWrite()}return}
   if(d.st!==undefined){const sc=S.scenes.find(x=>x.id===d.st);if(sc){sc.status=t.value;save();refreshWrite()}return}
@@ -569,6 +1140,7 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='uscan'){const el=document.getElementById('usage')||{};el.textContent='調べています…';try{el.textContent=await usageText()}catch(e){el.textContent='調べられませんでした'}return}
   if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage')||{};const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
   if(act==='mkexp'){const m=document.getElementById('msg'),o=document.getElementById('out');m.textContent='作成中…';await ensureImgs();o.value=exportJson();m.textContent='作成しました（'+fmt(o.value.length)+'）';return}
+  if(memoHandleClick(act,b))return;
   if(act==='mode'){EDIT[tab]=!EDIT[tab];const y=window.scrollY;render();window.scrollTo(0,y);return}
   if(act==='pickf'){SEL.f=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,y0);return}
   if(act==='fsview'){tab='fs';SEL.f=b.dataset.id;render();return}
