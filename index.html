@@ -1091,7 +1091,7 @@ const VIEWS={
 function render(){
   document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" data-act="tab" data-k="${k}" aria-selected="${k===tab}">${l}</button>`).join('');
   const sh=document.querySelector('.sheet'),sl=sh?sh.scrollLeft:0;RO=(tab in EDIT)&&!EDIT[tab];const ls=document.querySelector('.side .list'),lt=(ls&&lastTab===tab)?ls.scrollTop:0;document.getElementById('main').innerHTML=(tab in EDIT?modeBar():'')+VIEWS[tab]();lastTab=tab;const ls2=document.querySelector('.side .list');if(ls2&&lt)ls2.scrollTop=lt;const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollLeft=sl;
-  document.querySelector('.title').value=S.title||'';renderWbar();if(ST.nk)fetchVisible();
+  document.querySelector('.title').value=S.title||'';renderWbar();fetchVisible();
 }
 document.addEventListener('input',e=>{
   const t=e.target,d=t.dataset;
