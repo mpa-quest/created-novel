@@ -285,7 +285,8 @@ const buildSheets=()=>{const M=METHODS[S.method||'kisho'],T=treeD(),LB=labels(),
   const getHoldingItemTitles=cid=>{const c=S.chars.find(x=>x.id===cid),ids=new Set((c&&c.keyItems)||[]),t=[];(S.refs||[]).forEach(g=>(g.items||[]).forEach(it=>{if(ids.has(it.id))t.push(it.title||'（無題）')}));if(SRD)(SRD.refs||[]).forEach(g=>(g.items||[]).forEach(it=>{if(ids.has(it.id))t.push((it.title||'（無題）')+'（共有）')}));return t};
   const keys=CF.filter(f=>f[0]!=='name'),ap={};L.forEach(s=>(s.cids||[]).forEach(id=>{(ap[id]=ap[id]||[]).push(LB[s.id]+'｜'+(sn(s)||s.place||''))}));
   const prow=[['名前','区分',...keys.map(f=>f[1]),'追加項目','共有（シリーズ）','登場回数','登場するシーン']];
-  S.chars.forEach(c=>prow.push([c.name||'',c.grp||'',...keys.map(f=>{if(f[0]==='item'){const t=getHoldingItemTitles(c.id);return (t.length?'【所持資料】'+t.join('、')+(c.item?'\n':''))+(c.item||'')}return c[f[0]]||''}),(c.extra||[]).filter(x=>x.k||x.v).map(x=>(x.k||'')+'：'+(x.v||'')).join('\n'),linked(c)?'共有':'',(ap[c.id]||[]).length,(ap[c.id]||[]).join('\n')]));
+  const charValue=(c,f)=>{if(f[0]!=='item')return c[f[0]]||'';const t=getHoldingItemTitles(c.id);return (t.length?'【所持資料】'+t.join('、')+(c.item?'\n':''):'')+(c.item||'')};
+  S.chars.forEach(c=>prow.push([c.name||'',c.grp||'',...keys.map(f=>charValue(c,f)),(c.extra||[]).filter(x=>x.k||x.v).map(x=>(x.k||'')+'：'+(x.v||'')).join('\n'),linked(c)?'共有':'',(ap[c.id]||[]).length,(ap[c.id]||[]).join('\n')]));
   const lab=id=>{const s=L.find(x=>x.id===id);return LB[id]+(s?'｜'+(sn(s)||s.place||''):'')};
   const frow=[['番号','名前','内容・メモ','状態','張る場面','回収する場面']];
   F.forEach((f,n)=>{const i=fsInfo(f);frow.push([fsNo(n),f.title||'',f.note||'',i.st==='ok'?'回収済み':i.st==='bad'?'未回収':'要確認：'+i.msg,i.pl.map(lab).join('\n'),i.py.map(lab).join('\n')])});
