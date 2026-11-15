@@ -114,30 +114,60 @@ body {
   border-color: var(--accent);
 }
 
-/* 上部ナビゲーションタブ */
-nav {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
+/* 大分類とサブタブを分けた、横スクロール可能なメニュー */
+#tabs {
   margin: 14px 0 20px;
-  padding-bottom: 2px;
+  border-bottom: 1px solid var(--line);
 }
 
-nav button {
+.nav-main,
+.nav-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.nav-main {
+  padding-bottom: 5px;
+}
+
+.nav-sub {
+  min-height: 43px;
+  padding: 5px 0 7px;
+}
+
+.nav-main button,
+.nav-sub button {
   flex: none;
   border: 0;
   background: transparent;
   color: var(--sub);
   font-family: inherit;
   font-weight: 500;
-  font-size: 15px;
-  padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
   letter-spacing: 0.03em;
 }
 
-nav button[aria-selected="true"] {
+.nav-main button {
+  font-size: 14px;
+  padding: 6px 12px;
+}
+
+.nav-sub button {
+  font-size: 14px;
+  padding: 5px 11px;
+}
+
+.nav-main button[aria-selected="true"] {
+  background: var(--soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.nav-sub button[aria-selected="true"] {
   background: var(--accent);
   color: var(--on);
 }

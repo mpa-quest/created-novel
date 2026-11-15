@@ -20,7 +20,7 @@
  * キャッシュの保存先につける名前（バージョン）です。
  * アプリの画面やアイコンを大幅に更新したときは、この文字を変えると新しい内容が読み込まれます。
  */
-const CACHE_NAME = "sousaku-note-cache-v7";
+const CACHE_NAME = "sousaku-note-cache-v8";
 
 
 /**

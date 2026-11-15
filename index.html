@@ -16,7 +16,7 @@
   <input class="title" data-p="title" placeholder="作品のタイトル" aria-label="作品のタイトル">
   <div id="sync" class="sync" aria-live="polite"></div>
   <div id="warn" class="warn" hidden>端末内への保存に失敗しました（空き容量不足の可能性があります）。「保存」タブで書き出して控えを取ってください。</div>
-  <nav id="tabs" role="tablist"></nav>
+  <nav id="tabs" aria-label="アプリメニュー"></nav>
   <main id="main"></main>
 </div>
 <script>
@@ -882,7 +882,15 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 const roBox=(l,v)=>`<div class="f"><span>${l}</span><div class="ro${v?'':' mut'}">${v?esc(v):'（未入力）'}</div></div>`;
 const ta=(l,a,v,r,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><textarea rows="${r||3}" ${a} placeholder="${h||''}">${esc(v)}</textarea></label>`;
 const ip=(l,a,v,h)=>RO?roBox(l,v):`<label class="f"><span>${l}</span><input ${a} value="${esc(v)}" placeholder="${h||''}"></label>`;
-const TABS=[['ov','概要'],['plot','プロット'],['scenes','箱書き'],['sheet','シート'],['write','執筆'],['fs','伏線'],['chars','人物'],['refs','資料'],['series','シリーズ'],['memo','メモ'],['io','保存']];
+const NAV_GROUPS=[
+  {id:"idea",label:"構想",tabs:[["ov","概要"],["plot","プロット"]]},
+  {id:"structure",label:"構成",tabs:[["scenes","箱書き"],["sheet","シート"],["fs","伏線"]]},
+  {id:"writing",label:"執筆",tabs:[["write","本文"]]},
+  {id:"settings",label:"人物・設定",tabs:[["chars","人物"],["refs","資料"],["series","シリーズ"]]},
+  {id:"memo",label:"メモ",tabs:[["memo","メモ"]]},
+  {id:"save",label:"保存",tabs:[["io","保存"]]}
+];
+const NAV_LAST={idea:"ov",structure:"scenes",writing:"write",settings:"chars",memo:"memo",save:"io"};
 
 function bar(kind,i,n,label){if(RO)return `<div class="bar sb"><b>${label}</b></div>`;
   return `<div class="bar sb"><b>${label}</b><button data-act="up" data-k="${kind}" data-i="${i}" ${i===0?'disabled':''} aria-label="上へ">↑</button><button data-act="down" data-k="${kind}" data-i="${i}" ${i===n-1?'disabled':''} aria-label="下へ">↓</button><button data-act="del" data-k="${kind}" data-i="${i}">削除</button></div>`;
@@ -1048,7 +1056,9 @@ const VIEWS={
     <button class="pri" data-act="import">読み込む</button>`
 };
 function render(){
-  document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" data-act="tab" data-k="${k}" aria-selected="${k===tab}">${l}</button>`).join('');
+  const activeGroup=NAV_GROUPS.find(group=>group.tabs.some(([key])=>key===tab))||NAV_GROUPS[0];
+  NAV_LAST[activeGroup.id]=tab;
+  document.getElementById('tabs').innerHTML=`<div class="nav-main" role="tablist" aria-label="メニュー分類">${NAV_GROUPS.map(group=>`<button role="tab" data-act="navgroup" data-k="${group.id}" aria-selected="${group.id===activeGroup.id}" aria-controls="nav-subtabs">${group.label}</button>`).join('')}</div><div class="nav-sub" id="nav-subtabs" role="tablist" aria-label="${activeGroup.label}">${activeGroup.tabs.map(([key,label])=>`<button role="tab" data-act="tab" data-k="${key}" aria-selected="${key===tab}">${label}</button>`).join('')}</div>`;
   const sh=document.querySelector('.sheet'),sl=sh?sh.scrollLeft:0;RO=(tab in EDIT)&&!EDIT[tab];const ls=document.querySelector('.side .list'),lt=(ls&&lastTab===tab)?ls.scrollTop:0;document.getElementById('main').innerHTML=(tab in EDIT?modeBar():'')+VIEWS[tab]();lastTab=tab;const ls2=document.querySelector('.side .list');if(ls2&&lt)ls2.scrollTop=lt;const sh2=document.querySelector('.sheet');if(sh2)sh2.scrollLeft=sl;
   document.querySelector('.title').value=S.title||'';renderWbar();fetchVisible();
 }
@@ -1133,6 +1143,7 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='imdel'){if(!arm(b,'×','削除？'))return;tgt(b.dataset.t).imgs.splice(+b.dataset.j,1);savesc(b.dataset.t);render();return}
   if(act==='xadd'){const c=S.chars[i];(c.extra=c.extra||[]).push({k:'',v:''});save();render();const el=document.querySelector('[data-x="'+i+'.'+(c.extra.length-1)+'"][data-xk="k"]');if(el)el.focus();return}
   if(act==='xdel'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='もう一度押して削除';setTimeout(()=>{b.classList.remove('armed');b.textContent='削除'},3000);return}S.chars[i].extra.splice(+b.dataset.j,1);save();render();return}
+  if(act==='navgroup'){const group=NAV_GROUPS.find(item=>item.id===k);if(group){tab=NAV_LAST[group.id]||group.tabs[0][0];render()}return}
   if(act==='tab'){tab=k;render();return}
   if(act==='add'){if(k==='chars'){NEWGRP=cgSel()>=0?S.cg[cgSel()]:((S.chars[selChar()]||{}).grp||'');SEL.chars=S.chars.length;SEL.cg=-1}S[k].push(k==='scenes'?{id:uid(),lv:+b.dataset.lv||3,part:lastPart(),title:'',place:'',time:'',emv:'',chars:'',event:'',memo:''}:{id:uid(),name:'',role:'',want:'',flaw:'',secret:'',grp:NEWGRP||''});save();render();if(k==='scenes')window.scrollTo(0,document.body.scrollHeight);return}
   if(act==='up'||act==='down'){if(k==='scenes'){const j=sibIdx(i,act==='up'?-1:1);if(j>=0){const L=S.scenes;[L[i],L[j]]=[L[j],L[i]]}}else{const j=act==='up'?i-1:i+1;[S[k][i],S[k][j]]=[S[k][j],S[k][i]];if(k==='chars')SEL.chars=j}save();render();return}
