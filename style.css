@@ -699,6 +699,75 @@ div.bx {
   overflow-wrap: anywhere;
 }
 
+/* 箱書きタブの左ペインに表示する、構成見出しと階層リスト */
+.scene-group-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 2px 4px;
+  margin-top: 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.scene-group-title span {
+  flex: 1;
+  min-width: 5em;
+  color: var(--sub);
+  font-size: 12px;
+}
+
+.scene-group-title .sec.sm {
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.scene-li {
+  justify-content: flex-start;
+}
+
+.scene-li.scene-depth-1 {
+  margin-left: 10px;
+  width: calc(100% - 10px);
+}
+
+.scene-li.scene-depth-2 {
+  margin-left: 20px;
+  width: calc(100% - 20px);
+}
+
+.scene-kind {
+  flex: none;
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.scene-li.on .scene-kind {
+  color: var(--on);
+}
+
+.scene-add-child {
+  align-self: flex-start;
+  margin: 0 0 3px 10px;
+  padding: 3px 7px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sub);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scene-add-child.scene-depth-2 {
+  margin-left: 20px;
+}
+
+.scene-detail > .card {
+  margin-bottom: 0;
+}
+
 .li.lh {
   font-weight: 700;
   margin-top: 6px;
