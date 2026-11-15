@@ -89,7 +89,7 @@ const setImg=id=>document.querySelectorAll('img[data-iid="'+id+'"]').forEach(im=
 const uploadImgs=async d=>{for(const id of refIds(d)){if(ST.up[id])continue;const v=IMG[id]||await kvGet('I:'+id);if(!v)continue;const r=await call({op:'imgput',iid:id,data:v});if(!r.ok)return false;ST.up[id]=1;stSave();if(ST.nk)kvDel('I:'+id).catch(()=>{})}return true};
 const fetchMissing=async()=>{if(!ST.cfg||fm||ST.nk)return;fm=true;try{for(const id of allIds()){if(IMG[id])continue;const r=await call({op:'imgget',iid:id});if(r.ok&&r.data){IMG[id]=r.data;ST.up[id]=1;kvSet('I:'+id,r.data).catch(()=>{});setImg(id)}}stSave()}catch(e){}fm=false};
 const exportJson=()=>JSON.stringify(Object.assign({},S,{_imgs:Object.fromEntries(refIds().filter(id=>IMG[id]).map(id=>[id,IMG[id]]))}));
-let RO=false,lastTab=null;const EDIT={ov:false,plot:false,chars:false,refs:false};
+let RO=false,lastTab=null;const EDIT={ov:false,plot:false,chars:false,refs:false,fs:false,memo:false};
 const modeBar=()=>`<div class="modebar"><button class="sec" data-act="mode">${RO?'✎ 編集モードにする':'閲覧モードにする'}</button><span class="hint">${RO?'いまは閲覧モードです。長い文章も、そのまま読めます。':'いまは編集モードです。'}</span></div>`;
 const SEL={chars:0,cg:-1,w:null,f:null,r:{sc:'w',gi:0,ii:-1}};
 const selChar=()=>{const n=S.chars.length;if(SEL.chars>=n)SEL.chars=n-1;if(SEL.chars<0)SEL.chars=0;return SEL.chars};
@@ -600,13 +600,13 @@ function memoTagBarHtml() {
  */
 function memoDetailHtml(memo) {
   if (!memo) {
-    return "<div class=\"empty\">左の「＋ メモを追加」から、メモを作りましょう。</div>";
+    return "<div class=\"empty\">" + (RO ? "メモはまだありません。" : "左の「＋ メモを追加」から、メモを作りましょう。") + "</div>";
   }
 
   // このメモについているタグを、削除ボタンつきで並べます
   const chips = (memo.tags || []).map(function (tag) {
     return "<span class=\"mtag\">#" + esc(tag)
-      + "<button data-act=\"memoTagDel\" data-id=\"" + memo.id + "\" data-tag=\"" + esc(tag) + "\" aria-label=\"タグを外す\">×</button></span>";
+      + (RO ? "" : "<button data-act=\"memoTagDel\" data-id=\"" + memo.id + "\" data-tag=\"" + esc(tag) + "\" aria-label=\"タグを外す\">×</button>") + "</span>";
   }).join("");
 
   // 入力の候補として、すでに使っているタグを出します
@@ -615,15 +615,15 @@ function memoDetailHtml(memo) {
   }).join("");
 
   return "<section class=\"card\">"
-    + "<div class=\"bar sb\"><b>メモ</b><button data-act=\"memoDelete\" data-id=\"" + memo.id + "\">削除</button></div>"
-    + "<label class=\"f\"><span>タイトル</span><input data-mt=\"" + memo.id + "\" value=\"" + esc(memo.title) + "\" placeholder=\"タイトル\"></label>"
+    + "<div class=\"bar sb\"><b>メモ</b>" + (RO ? "" : "<button data-act=\"memoDelete\" data-id=\"" + memo.id + "\">削除</button>") + "</div>"
+    + (RO ? roBox("タイトル", memo.title) : "<label class=\"f\"><span>タイトル</span><input data-mt=\"" + memo.id + "\" value=\"" + esc(memo.title) + "\" placeholder=\"タイトル\"></label>")
     + "<div class=\"f\"><span>タグ</span>"
     + "<div class=\"fsl\">" + (chips || "<span class=\"mut\">なし</span>") + "</div>"
-    + "<div class=\"fsadd\"><input id=\"memo-tag-input\" list=\"memo-tag-options\" placeholder=\"タグを入力して、Enterか「追加」\">"
-    + "<button class=\"sec\" data-act=\"memoTagAdd\" data-id=\"" + memo.id + "\">追加</button></div>"
-    + "<datalist id=\"memo-tag-options\">" + options + "</datalist></div>"
-    + "<label class=\"f\"><span>本文（<b id=\"memo-count\">" + Array.from(memo.body || "").length + "</b>字）</span>"
-    + "<textarea rows=\"18\" data-mb=\"" + memo.id + "\">" + esc(memo.body) + "</textarea></label>"
+    + (RO ? "" : "<div class=\"fsadd\"><input id=\"memo-tag-input\" list=\"memo-tag-options\" placeholder=\"タグを入力して、Enterか「追加」\">"
+      + "<button class=\"sec\" data-act=\"memoTagAdd\" data-id=\"" + memo.id + "\">追加</button></div>"
+      + "<datalist id=\"memo-tag-options\">" + options + "</datalist>") + "</div>"
+    + (RO ? roBox("本文", memo.body) : "<label class=\"f\"><span>本文（<b id=\"memo-count\">" + Array.from(memo.body || "").length + "</b>字）</span>"
+      + "<textarea rows=\"18\" data-mb=\"" + memo.id + "\">" + esc(memo.body) + "</textarea></label>")
     + "<p class=\"hint\">作成：" + memoDateText(memo.created) + "　更新：" + memoDateText(memo.updated) + "</p>"
     + "</section>";
 }
@@ -644,7 +644,7 @@ function memoView() {
 
   return "<p class=\"hint\">世界観、取材メモ、思いついたことなどを、自由に書きとめます。タグをつけると、あとから絞り込めます。</p>"
     + "<div class=\"ms2\"><div class=\"side\">"
-    + "<button class=\"add sm\" data-act=\"memoAdd\">＋ メモを追加</button>"
+    + (RO ? "" : "<button class=\"add sm\" data-act=\"memoAdd\">＋ メモを追加</button>")
     + memoTagBarHtml()
     + "<p class=\"hint\" id=\"memo-count-text\">" + countText + "</p>"
     + "<div class=\"list\">" + memoListHtml() + "</div>"
@@ -984,13 +984,13 @@ const VIEWS={
     const top=`<div class="top"><svg class="mtn" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40L8 33L14 36L24 20L30 27L42 10L48 18L60 5L70 16L82 2L100 40Z"/></svg><div class="r1">${tc('アンチテーゼ',O.anti,'g')}<div class="ar"><i>◀</i><i>▶</i></div>${tc('テーマ',O.theme,'g')}</div><div class="r1">${tc('天地人',O.tcj)}${tc('障害：事件・事情・事実',O.conflict)}${tc('定着・余韻',O.ending)}</div><div class="r1">${tc('欲望',O.want)}<div class="ar"><i></i><span class="pill">貫通行動${O.thru?'：'+esc(O.thru):''}</span><i>▶</i></div>${tc('目的',O.goal)}</div></div>`;
     return msel()+`<p class="hint">${S.scenes.length?'入力したデータをシートの形で確認します。大箱・中箱をタップすると、下の階層が展開されます。編集は各タブで行います。◆＝伏線を張る、◇＝回収です（番号は伏線タブと同じ）。':'箱書きタブで大箱・中箱・小箱をつくると、ここに並びます。'}</p><div class="sheet"><div class="sin">${top}<div class="gr" ${gt}>${bands.join('')}</div><div class="gr" ${gt}>${cols.map(big).join('')}</div>${cols.map(ex).join('')}</div></div>${emoGraph()}<p class="note">大箱＝構成上の機能／中箱＝シークエンスの役割／小箱＝その役割とキャラクター</p>`},
   fs:()=>{const F=S.fs||[];if(!F.some(x=>x.id===SEL.f))SEL.f=F.length?F[0].id:null;const L=smallsInOrder(),LB=labels(),cnt={bad:0,warn:0,ok:0};F.forEach(f=>{cnt[fsInfo(f).st]++});
-    const f=F.find(x=>x.id===SEL.f);let det='<div class="empty">左の「＋ 伏線を追加」から作るか、箱書きの小箱のカードで伏線を張ってください。</div>';
+    const f=F.find(x=>x.id===SEL.f);let det='<div class="empty">'+(RO?'伏線はまだありません。':'左の「＋ 伏線を追加」から作るか、箱書きの小箱のカードで伏線を張ってください。')+'</div>';
     if(f){const no=fsNo(F.indexOf(f)),inf=fsInfo(f);
-      const row=(sid,k)=>{const sc=L.find(x=>x.id===sid);return `<div class="xh"><span class="rt">${esc(LB[sid])}｜${esc(sc?(sn(sc)||sc.place||''):'')}</span><button data-act="gobox" data-id="${sid}">箱書きで開く</button><button data-act="fsunlink" data-fid="${f.id}" data-sid="${sid}" data-k="${k}">外す</button></div>`};
+      const row=(sid,k)=>{const sc=L.find(x=>x.id===sid);return `<div class="xh"><span class="rt">${esc(LB[sid])}｜${esc(sc?(sn(sc)||sc.place||''):'')}</span><button data-act="gobox" data-id="${sid}">箱書きで開く</button>${RO?'':`<button data-act="fsunlink" data-fid="${f.id}" data-sid="${sid}" data-k="${k}">外す</button>`}</div>`};
       const opts=k=>L.filter(x=>!(f[k]||[]).includes(x.id)).map(x=>`<option value="${x.id}">${esc(LB[x.id])}｜${esc(sn(x)||x.place||'')}</option>`).join('');
-      const blk=(k,sym,title)=>{const ids=k==='plant'?inf.pl:inf.py;return `<div class="f"><span>${sym} ${title}（${ids.length}）</span>${ids.map(sid=>row(sid,k)).join('')||'<p class="hint">まだありません。</p>'}${L.length?`<div class="xh"><select id="fsadd-${k}">${opts(k)}</select><button class="sec" data-act="fsaddsc" data-fid="${f.id}" data-k="${k}">追加</button></div>`:''}</div>`};
-      det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>伏線 ${no}</b><button data-act="fsdel" data-id="${f.id}">削除</button></div><div class="fsmsg ${inf.st}">${inf.msg}</div>${ip('名前','data-ft="'+f.id+'"',f.title,'例：机の中の古い手紙')}${ta('内容・メモ（何を仕込み、どう回収するか）','data-fn="'+f.id+'"',f.note,3)}${blk('plant','◆','張る場面')}${blk('pay','◇','回収する場面')}</section>`}
-    return `<p class="hint">伏線を張る場面（◆）と、回収する場面（◇）を、小箱に結びつけます。未回収や、順番の逆転は、一覧と詳細でお知らせします。</p><div class="card"><div>未回収 ${cnt.bad}件／要確認 ${cnt.warn}件／回収済み ${cnt.ok}件</div></div><div class="ms2"><div class="side"><div class="list">${fsList()}</div><button class="add sm" data-act="fsnew">＋ 伏線を追加</button></div><div class="detail">${det}</div></div>`},
+      const blk=(k,sym,title)=>{const ids=k==='plant'?inf.pl:inf.py;return `<div class="f"><span>${sym} ${title}（${ids.length}）</span>${ids.map(sid=>row(sid,k)).join('')||'<p class="hint">まだありません。</p>'}${!RO&&L.length?`<div class="xh"><select id="fsadd-${k}">${opts(k)}</select><button class="sec" data-act="fsaddsc" data-fid="${f.id}" data-k="${k}">追加</button></div>`:''}</div>`};
+      det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>伏線 ${no}</b>${RO?'':`<button data-act="fsdel" data-id="${f.id}">削除</button>`}</div><div class="fsmsg ${inf.st}">${inf.msg}</div>${ip('名前','data-ft="'+f.id+'"',f.title,'例：机の中の古い手紙')}${ta('内容・メモ（何を仕込み、どう回収するか）','data-fn="'+f.id+'"',f.note,3)}${blk('plant','◆','張る場面')}${blk('pay','◇','回収する場面')}</section>`}
+    return `<p class="hint">伏線を張る場面（◆）と、回収する場面（◇）を、小箱に結びつけます。未回収や、順番の逆転は、一覧と詳細でお知らせします。</p><div class="card"><div>未回収 ${cnt.bad}件／要確認 ${cnt.warn}件／回収済み ${cnt.ok}件</div></div><div class="ms2"><div class="side"><div class="list">${fsList()}</div>${RO?'':`<button class="add sm" data-act="fsnew">＋ 伏線を追加</button>`}</div><div class="detail">${det}</div></div>`},
   write:()=>{const L=smallsInOrder(),LB=labels(),cur=selW(),s=L.find(x=>x.id===cur),g=S.goal||{};
     const top=`<section class="card"><div class="bar"><b>全体の進み具合</b></div><div class="row"><label class="f"><span>目標の枚数（400字詰め）</span><input type="number" min="0" step="0.5" data-gp="1" value="${esc(g.pages)}" placeholder="例：30"></label><label class="f"><span>締切</span><input type="date" data-gd="1" value="${esc(g.deadline)}"></label></div><div id="wsum" class="wsum">${wsumHtml()}</div></section>`;
     let det='<div class="empty">箱書きタブで小箱をつくると、ここで本文を書けます。</div>';
