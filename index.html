@@ -92,6 +92,7 @@ const exportJson=()=>JSON.stringify(Object.assign({},S,{_imgs:Object.fromEntries
 let RO=false,lastTab=null;const EDIT={ov:false,plot:false,scenes:false,chars:false,refs:false,fs:false,memo:false};
 const modeBar=()=>`<div class="modebar"><button class="sec" data-act="mode">${RO?'✎ 編集モードにする':'閲覧モードにする'}</button><span class="hint">${RO?'いまは閲覧モードです。長い文章も、そのまま読めます。':'いまは編集モードです。'}</span></div>`;
 const SEL={chars:0,cg:-1,w:null,f:null,scene:null,scenePart:'',r:{sc:'w',gi:0,ii:-1}};
+let writeReading=false;
 const selChar=()=>{const n=S.chars.length;if(SEL.chars>=n)SEL.chars=n-1;if(SEL.chars<0)SEL.chars=0;return SEL.chars};
 const cgOpen={},refOpen={};let NEWGRP='';
 const cgSel=()=>{const g=S.cg||[];return SEL.cg>=0&&SEL.cg<g.length?SEL.cg:-1};
@@ -239,7 +240,19 @@ function charKeyItemUI(c, i, a) {
 
 
 const appearHtml=c=>{const all=smallsInOrder();if(!all.length)return '';const L=all.filter(s=>(s.cids||[]).includes(c.id)),LB=labels();return `<div class="f"><span>登場するシーン（${L.length}）</span>${L.length?`<div class="ctx">${L.map(s=>`<div>${esc(LB[s.id])}｜${esc(sn(s)||s.place||'')}</div>`).join('')}</div>`:'<p class="hint">まだ、どのシーンにも登場していません。箱書きの小箱で、登場人物に選んでください。</p>'}</div>`};
-const cc=s=>Array.from(String(s.text||'').replace(/\n/g,'')).length;
+/**
+ * 本文の文字数を数えます。
+ * ルビ記法は、読みではなく親文字だけを原稿の文字数に含めます。
+ * @param {object} s 小箱のデータ
+ * @returns {number} 本文の文字数
+ */
+const cc=s=>Array.from(String(s.text||'').replace(/｜([^｜《》\n]+)《([^《》\n]+)》/g,'$1').replace(/\n/g,'' )).length;
+/**
+ * ルビ記法を、閲覧画面用の安全なHTMLへ変換します。
+ * @param {string} text ルビ記法を含む本文
+ * @returns {string} ruby要素と改行要素で構成した本文
+ */
+const rubyHtml=text=>esc(String(text||'')).replace(/｜([^｜《》\n]+)《([^《》\n]+)》/g,'<ruby>$1<rt>$2</rt></ruby>').replace(/\n/g,'<br>');
 const fmtN=n=>n.toLocaleString('ja-JP');
 const STN={'':'未着手',draft:'下書き',done:'推敲済'};
 const stIdx=s=>s.status==='done'?2:s.status==='draft'?1:0;
@@ -1035,8 +1048,10 @@ const VIEWS={
     let det='<div class="empty">箱書きタブで小箱をつくると、ここで本文を書けます。</div>';
     if(s){const ids=new Set(s.cids||[]),cs=S.chars.filter(c=>ids.has(c.id));
       const ctx=`<div class="ctx">${fsRows(s.id)}${s.role?`<div><b>役割</b>${esc(s.role)}</div>`:''}${s.event?`<div><b>出来事</b>${esc(s.event)}</div>`:''}${cs.length?`<div><b>登場</b>${esc(cs.map(c=>c.name||'（名前なし）').join('、'))}</div>`:''}${cs.filter(c=>(s.aims||{})[c.id]).map(c=>`<div><b>${esc(c.name||'人物')}</b>${esc(s.aims[c.id])}</div>`).join('')}</div>`;
-      det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>${esc(LB[s.id])}</b><button data-act="gobox" data-id="${s.id}">箱書きで開く</button></div><label class="f"><span>状態</span><select data-st="${s.id}">${Object.entries(STN).map(([k,v])=>`<option value="${k}" ${(s.status||'')===k?'selected':''}>${v}</option>`).join('')}</select></label>${ctx.includes('<div>')?ctx:''}<label class="f"><span>本文（<b id="wcnt">${fmtN(cc(s))}</b>字）</span><textarea rows="20" data-tx="${s.id}" placeholder="ここに本文を書きます">${esc(s.text||'')}</textarea></label></section>`}
-    return `<p class="hint">小箱ごとに本文を書きます。箱書きの順番に、原稿がつながります。</p>${top}<div class="ms2"><div class="side"><div class="list">${writeList()}</div></div><div class="detail">${det}</div></div>`},
+      const toolbar=`<div class="write-toolbar" role="toolbar" aria-label="執筆用アクション"><button type="button" class="sec write-tool" data-act="wtool" data-tool="space" title="全角スペースを挿入"><span class="write-icon" aria-hidden="true">↔</span><span>スペース</span></button><button type="button" class="sec write-tool" data-act="wtool" data-tool="brackets" title="かぎ括弧を挿入"><span class="write-icon" aria-hidden="true">「」</span><span>括弧</span></button><button type="button" class="sec write-tool" data-act="wtool" data-tool="ellipsis" title="三点リーダーを挿入"><span class="write-icon" aria-hidden="true">…</span><span>……</span></button><button type="button" class="sec write-tool" data-act="wtool" data-tool="dash" title="ダッシュを挿入"><span class="write-icon" aria-hidden="true">—</span><span>――</span></button><button type="button" class="sec write-tool" data-act="wtool" data-tool="ruby" title="選択した文字にルビを付ける"><span class="write-icon write-ruby-icon" aria-hidden="true">文<small>あ</small></span><span>ルビ</span></button></div>`;
+      const body=writeReading?`<div class="write-reading" lang="ja">${rubyHtml(s.text)}</div>`:`${toolbar}<textarea class="write-editor" rows="20" data-tx="${s.id}" placeholder="ここに本文を書きます">${esc(s.text||'')}</textarea>`;
+      det=`<section class="card" style="border-left-color:var(--c3)"><div class="bar sb"><b>${esc(LB[s.id])}</b><button data-act="gobox" data-id="${s.id}">箱書きで開く</button></div><label class="f"><span>状態</span><select data-st="${s.id}" ${writeReading?'disabled':''}>${Object.entries(STN).map(([k,v])=>`<option value="${k}" ${(s.status||'')===k?'selected':''}>${v}</option>`).join('')}</select></label>${ctx.includes('<div>')?ctx:''}<div class="write-body"><div class="write-body-head"><b>本文（<span id="wcnt">${fmtN(cc(s))}</span>字）</b></div>${body}</div></section>`}
+    return `<p class="hint">小箱ごとに本文を書きます。箱書きの順番に、原稿がつながります。</p>${top}<div class="write-modebar"><button class="sec" data-act="wmode" aria-pressed="${writeReading}">${writeReading?'✎ 編集画面':'◉ 閲覧画面'}</button><span class="hint">${writeReading?'ルビを振って表示します。':'編集画面ではルビ記法が表示されます。'}</span></div><div class="ms2"><div class="side"><div class="list">${writeList()}</div></div><div class="detail">${det}</div></div>`},
   refs:()=>{const {cur,ii}=refSel();
     let det=RO?'<div class="empty">資料はまだありません。編集モードにすると、区分を追加できます。</div>':'<div class="empty">左の「＋ 区分を追加」から作りましょう。</div>';
     if(cur){const {g,sc,gi}=cur;
@@ -1117,6 +1132,31 @@ document.addEventListener('click',async e=>{document.querySelectorAll('details.m
   if(act==='uclean'){if(!arm(b,'端末内の送信済みの画像を消す','端末内の画像を消します（ドライブの画像は残ります）。もう一度押す'))return;const el=document.getElementById('usage')||{};const r=await cleanLocal();el.textContent='端末内の画像を'+r.n+'枚（'+fmt(r.bytes)+'）消しました。ドライブ側の画像は、そのまま残っています。';return}
   if(act==='mkexp'){const m=document.getElementById('msg'),o=document.getElementById('out');m.textContent='作成中…';await ensureImgs();o.value=exportJson();m.textContent='作成しました（'+fmt(o.value.length)+'）';return}
   if(memoHandleClick(act,b))return;
+  // 執筆タブだけで編集画面と、ルビを反映した閲覧画面を切り替えます。
+  if(act==='wmode'){writeReading=!writeReading;const y=window.scrollY;render();window.scrollTo(0,y);return}
+  // 選択範囲を保ちながら、本文へ記号やルビ記法を挿入します。
+  if(act==='wtool'){
+    const field=document.querySelector('textarea[data-tx]');
+    if(!field||writeReading)return;
+    const start=field.selectionStart,end=field.selectionEnd,value=field.value;
+    let inserted='',caret=start;
+    if(b.dataset.tool==='space')inserted='　';
+    else if(b.dataset.tool==='brackets'){inserted='「」';caret=start+1}
+    else if(b.dataset.tool==='ellipsis')inserted='……';
+    else if(b.dataset.tool==='dash')inserted='――';
+    else if(b.dataset.tool==='ruby'){
+      const selected=value.slice(start,end);
+      if(!selected){alert('ルビを付ける文字を選択してください。');field.focus();return}
+      const reading=prompt('「'+selected+'」の読みを入力してください。');
+      if(reading===null){field.focus();return}
+      if(!reading.trim()){alert('ルビの読みを入力してください。');field.focus();return}
+      inserted='｜'+selected+'《'+reading.trim()+'》';
+    }
+    field.value=value.slice(0,start)+inserted+value.slice(end);
+    field.dispatchEvent(new Event('input',{bubbles:true}));
+    field.focus();field.setSelectionRange(caret===start?start+inserted.length:caret,caret===start?start+inserted.length:caret);
+    return
+  }
   if(act==='mode'){EDIT[tab]=!EDIT[tab];const y=window.scrollY;render();window.scrollTo(0,y);return}
   if(act==='pickf'){SEL.f=b.dataset.id;render();const dt=document.querySelector('.detail');if(dt&&window.innerWidth<640)dt.scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo(0,y0);return}
   if(act==='fsview'){tab='fs';SEL.f=b.dataset.id;render();return}

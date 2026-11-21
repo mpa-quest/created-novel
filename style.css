@@ -1464,3 +1464,100 @@ details.aimsd > summary {
   text-align: center;
   padding: 28px 0;
 }
+
+.write-modebar,
+.write-toolbar,
+.write-body-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.write-modebar {
+  margin: 14px 0;
+}
+
+.write-modebar .hint {
+  margin: 0;
+}
+
+.write-toolbar {
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.write-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+}
+
+.write-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.write-ruby-icon {
+  position: relative;
+  padding-right: 7px;
+}
+
+.write-ruby-icon small {
+  position: absolute;
+  top: -5px;
+  right: -3px;
+  font-size: 9px;
+}
+
+.write-body-head {
+  margin-bottom: 8px;
+}
+
+.write-editor {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: 1.9;
+  resize: vertical;
+}
+
+.write-reading {
+  min-height: 360px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 2.2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.write-reading ruby {
+  ruby-position: over;
+}
+
+.write-reading rt {
+  color: var(--sub);
+  font-size: 0.55em;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .write-modebar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .write-tool {
+    flex: 1 1 calc(33.333% - 8px);
+  }
+}
